@@ -80,15 +80,19 @@ derniers messages reçus pour vérifier.
 
 La configuration est persistée dans `localStorage`.
 
-## Interface BLE : ESP32-C6 + 2 encodeurs KY-040 (recommandé)
+## Interface BLE : ESP32-C3 (ou C6) + 2 encodeurs KY-040 (recommandé)
 
 Les KY-040 sont des encodeurs à quadrature **infinis et précis** (1 pas = 1 impulsion,
-pas de limite à 127 comme un CC MIDI absolu). L'ESP32-C6 envoie les pas par
+pas de limite à 127 comme un CC MIDI absolu). L'ESP32 envoie les pas par
 **Bluetooth (BLE)** directement dans le navigateur via **Web Bluetooth**.
+**C3 ou C6 : aucun changement fonctionnel** (même BLE, même API Arduino, même
+protocole) — seule la carte change dans l'IDE.
 
-- **Firmware** : `firmware/esp32c6-ky040/esp32c6-ky040.ino` (Arduino IDE, carte
-  « ESP32C6 Dev Module »). Câblage : KY-040 X → CLK GPIO4 / DT GPIO5 / SW GPIO6 ;
-  KY-040 Y → CLK GPIO7 / DT GPIO8 / SW GPIO9 (+3,3 V et GND communs).
+- **Firmware** : `firmware/esp32-ky040/esp32-ky040.ino`. Arduino IDE : carte
+  « **ESP32C3 Dev Module** » (ou « ESP32C6 Dev Module »), core ESP32 ≥ 2.0.
+  Câblage (broches sûres sur C3 et C6 — sur C3 éviter GPIO8/9 = flash/strapping
+  et GPIO18/19 = USB) : KY-040 X → CLK GPIO4 / DT GPIO5 / SW GPIO3 ;
+  KY-040 Y → CLK GPIO6 / DT GPIO7 / SW GPIO10 (+3,3 V et GND communs).
 - **Protocole** (service Nordic UART, notif binaire 2 octets) : `[0,d]` = axe X,
   `[1,d]` = axe Y (d = int8 signé), `[2,1]` = bouton SW X, `[3,1]` = bouton SW Y.
 - **Côté page** : bouton **« Connecter ESP32 (BLE) »** en haut de page (Chrome/Edge,
@@ -137,7 +141,7 @@ js/logic.js         trajectoires, niveaux, simulation d'essai, classes (pur, tes
 js/midi.js          Web MIDI : connexion, MIDI learn, calibration, persistance
 js/ble.js           Web Bluetooth : ESP32-C6 + KY-040 (NUS, protocole 2 octets)
 js/controls.js      manivelles -> point (MIDI, BLE, clavier, souris)
-firmware/esp32c6-ky040/  sketch Arduino ESP32-C6 + 2 KY-040 -> BLE
+firmware/esp32-ky040/    sketch Arduino ESP32-C3/C6 + 2 KY-040 -> BLE
 js/app.js           écrans, rendu canvas, boucle de jeu, historique, CSV
 test/*.test.js      tests Node (aucun framework requis)
 ```

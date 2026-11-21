@@ -1,15 +1,18 @@
-// RICOCHAY-ESP — ESP32-C6 + 2 encodeurs KY-040 -> BLE (Nordic UART Service)
+// RICOCHAY-ESP — ESP32-C3 (ou C6) + 2 encodeurs KY-040 -> BLE (Nordic UART Service)
+// Identique sur C3 et C6 : même BLE, même API Arduino BLEDevice.
 // Envoie sur la caractéristique TX NUS des notifications binaires de 2 octets :
 //   [0, delta] = axe X (delta int8 signé = pas de quadrature)
 //   [1, delta] = axe Y
 //   [2, 1]     = appui sur SW de l'encodeur X  -> Démarrer / Recommencer
 //   [3, 1]     = appui sur SW de l'encodeur Y  -> Quitter
 //
-// Câblage (modifiable ci-dessous) :
-//   KY-040 X : CLK->GPIO4  DT->GPIO5  SW->GPIO6  (+ -> 3.3V, GND -> GND)
-//   KY-040 Y : CLK->GPIO7  DT->GPIO8  SW->GPIO9  (+ -> 3.3V, GND -> GND)
+// Câblage (broches sûres sur C3 ET C6 ; sur C3, éviter GPIO8/9 = flash/strapping
+// et GPIO18/19 = USB) :
+//   KY-040 X : CLK->GPIO4  DT->GPIO5  SW->GPIO3  (+ -> 3.3V, GND -> GND)
+//   KY-040 Y : CLK->GPIO6  DT->GPIO7  SW->GPIO10 (+ -> 3.3V, GND -> GND)
 //
-// Arduino IDE : carte "ESP32C6 Dev Module", core ESP32 Arduino >= 2.0 (BLE inclus).
+// Arduino IDE : carte "ESP32C3 Dev Module" (ou "ESP32C6 Dev Module"),
+// core ESP32 Arduino >= 2.0 (BLE inclus).
 
 #include <BLEDevice.h>
 #include <BLEServer.h>
@@ -20,10 +23,10 @@
 
 #define X_CLK 4
 #define X_DT  5
-#define X_SW  6
-#define Y_CLK 7
-#define Y_DT  8
-#define Y_SW  9
+#define X_SW  3
+#define Y_CLK 6
+#define Y_DT  7
+#define Y_SW  10
 
 BLECharacteristic *txChar = nullptr;
 
