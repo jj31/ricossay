@@ -17,6 +17,9 @@
     mode: 'relatif',
     modeExplicite: true,   // false tant que l'utilisateur n'a pas choisi le mode
     sensibilite: 1.5,      // gain du mode relatif
+    padStart: null,        // notes des pads de fonction (appris par appui)
+    padRestart: null,
+    padQuit: null,
   };
 
   const MidiRig = {
@@ -26,12 +29,14 @@
     inputs: [],
     config: Object.assign({}, DEFAULTS),
     learn: null,            // null | 'x' | 'y' | 'auto'
+    learnPad: null,         // null | 'start' | 'restart' | 'quit'
     autoState: null,        // 'attenteX' | 'attenteY'
     calib: null,            // { x: {min,max}, y: {min,max} } pendant la calibration
     last: { x: null, y: null },
     crank: { x: 0.5, y: 0.5 },
     cb: {
       crank: function () {},   // (axis 'x'|'y', valeur normalisée 0..1)
+      action: function () {},  // ('start' | 'restart' | 'quit') appui sur un pad appris
       raw: function () {},     // (description texte du message MIDI brut)
       status: function () {},  // (texte de statut)
       mapping: function () {}, // la config a changé
@@ -108,6 +113,11 @@
     setLearn(target) {
       this.learn = target;
       if (target === 'auto') this.autoState = 'attenteX';
+      this.cb.mapping(this.config);
+    },
+
+    setLearnPad(target) {
+      this.learnPad = target;
       this.cb.mapping(this.config);
     },
 
@@ -192,8 +202,21 @@
           this.crank[axis] = norm;
           this.cb.crank(axis, norm);
         }
-      } else if (type === 0x90 || type === 0x80) {
-        this.cb.raw('Note ' + d1 + ' ' + (type === 0x90 ? 'on' : 'off') + ' vel ' + d2);
+      } else if (type === 0x90 && d2 > 0) {
+        // Appui sur un pad (Note On, vélocité > 0), quel que soit le canal.
+        this.cb.raw('Note ' + d1 + ' on (canal ' + ((status & 0x0F) + 1) + ')');
+        if (this.learnPad) {
+          const key = 'pad' + this.learnPad[0].toUpperCase() + this.learnPad.slice(1);
+          this.config[key] = d1;
+          this.learnPad = null;
+          this.save();
+          return;
+        }
+        if (d1 === this.config.padStart) this.cb.action('start');
+        else if (d1 === this.config.padRestart) this.cb.action('restart');
+        else if (d1 === this.config.padQuit) this.cb.action('quit');
+      } else if (type === 0x80 || type === 0x90) {
+        this.cb.raw('Note ' + d1 + ' off');
       }
     },
   };

@@ -88,5 +88,30 @@ ok(M.config.mode === 'relatif', 'mode forcé en relatif (encodeurs infinis, plus
 ok(M.config.ccX === 55 && M.config.ccY === 56 && M.config.inputName === 'MPK mini', 'CC appris et entrée conservés');
 M.config.ccX = 48; M.config.ccY = 49; M.config.mode = 'relatif'; M.save();
 
+console.log('Pads de fonction (apprentissage par appui + actions)');
+let action = null;
+M.cb.action = (n) => { action = n; };
+M.setLearnPad('start');
+M.handleMessage({ data: [0x90, 36, 100] });
+ok(M.config.padStart === 36 && M.learnPad === null, 'apprentissage pad Démarrer : note 36 assignée');
+M.handleMessage({ data: [0x90, 36, 100] });
+ok(action === 'start', 'appui note 36 -> action start');
+M.setLearnPad('restart');
+M.handleMessage({ data: [0x91, 37, 100] });
+ok(M.config.padRestart === 37, 'apprentissage pad Recommencer : note 37 (canal 2 accepté)');
+M.handleMessage({ data: [0x90, 37, 100] });
+ok(action === 'restart', 'appui note 37 -> action restart');
+M.setLearnPad('quit');
+M.handleMessage({ data: [0x90, 38, 100] });
+M.handleMessage({ data: [0x90, 38, 100] });
+ok(action === 'quit', 'appui note 38 -> action quit');
+M.handleMessage({ data: [0x90, 39, 100] });
+ok(action === 'quit', 'note 39 non assignée : aucune action (action précédente conservée)');
+M.handleMessage({ data: [0x80, 38, 0] });
+ok(action === 'quit', 'Note Off ignoré (pas d\'action au relâchement)');
+M.handleMessage({ data: [0x90, 38, 0] });
+ok(action === 'quit', 'Note On vélocité 0 ignoré');
+ok(JSON.parse(store['ricochay.config.v1']).padStart === 36, 'pads persistés dans localStorage');
+
 console.log(echecs === 0 ? '\nTOUS LES TESTS PASSENT' : '\n' + echecs + ' ECHEC(S)');
 process.exit(echecs === 0 ? 0 : 1);

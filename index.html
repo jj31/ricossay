@@ -33,6 +33,7 @@
       L'essai s'arrête dès que vous atteignez <strong>l'arrivée</strong> (extrémité du tracé,
       ou un tour complet pour les circuits fermés — marqueur orange). Un bip retentit quand
       vous touchez le bord de la piste, et un autre quand vous en sortez.
+      Sur l'écran d'essai, les pads appris (config MIDI) lancent Démarrer / Recommencer / Quitter.
       Sans APC : flèches du clavier / WASD, ou souris directement sur le plateau.
     </p>
     <div id="exercise-grid" class="grid"></div>
@@ -54,6 +55,14 @@
         <div class="btn-row">
           <button id="btn-calib" class="btn">Calibrer les butées (balayer X et Y)</button>
           <button id="btn-midi-reset" class="btn danger">Réinitialiser</button>
+        </div>
+        <h3>Pads de fonction (écran d'essai)</h3>
+        <p>Cliquez sur un bouton puis <strong>appuyez sur un pad</strong> du contrôleur :
+          il déclenchera Démarrer, Recommencer ou Quitter pendant l'essai.</p>
+        <div class="btn-row">
+          <button id="btn-pad-start" class="btn">Apprendre le pad « Démarrer »</button>
+          <button id="btn-pad-restart" class="btn">Apprendre le pad « Recommencer »</button>
+          <button id="btn-pad-quit" class="btn">Apprendre le pad « Quitter »</button>
         </div>
         <ul id="mapping-info" class="mapping-info"></ul>
         <h3>Options</h3>

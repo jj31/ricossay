@@ -67,6 +67,9 @@ python3 -m http.server 8080
    rotatifs infinis type MPK mini : aucun butée, le point n'est limité que par les
    bords de l'écran) ou **position absolue** (potentiomètres avec butées), et la
    sensibilité (gain du mode relatif).
+6. **Pads de fonction** : trois boutons d'apprentissage assignent des pads
+   (Note On) à **Démarrer**, **Recommencer** et **Quitter** sur l'écran d'essai :
+   cliquez sur « Apprendre le pad… » puis appuyez sur le pad du contrôleur.
 
 Rappels de mapping usine de l'APC mini mk2 (canal 1) : pads = notes 0–63,
 faders = CC 48–55 (+ master 56), boutons track/scene = notes 100–107 / 112–119.
@@ -122,6 +125,6 @@ test/*.test.js      tests Node (aucun framework requis)
 
 ```bash
 node test/logic.test.js     # trajectoires, point de départ, distance à la piste, arrêt à l'arrivée, scoring, classes
-node test/midi.test.js      # apprentissage CC, calibration, modes position/relatif
+node test/midi.test.js      # apprentissage CC + pads, calibration, modes position/relatif, migration
 node test/controls.test.js  # manivelles -> point, clavier, souris
 ```

@@ -129,7 +129,10 @@
       '<li>Manivelle <strong>Y</strong> (vertical) : CC <strong>' + c.ccY + '</strong> · butées ' + c.minY + '–' + c.maxY +
       ' · ' + (c.invY ? 'inversée' : 'normale') + '</li>' +
       '<li>Mode : <strong>' + (c.mode === 'position' ? 'position absolue (potentiomètre, avec butées)' : 'relatif (encodeurs infinis, sans butées)') + '</strong>' +
-      (MidiRig.calib ? ' · <strong>calibration en cours…</strong> balayez chaque bouton sur toute sa course' : '') + '</li>';
+      (MidiRig.calib ? ' · <strong>calibration en cours…</strong> balayez chaque bouton sur toute sa course' : '') + '</li>' +
+      '<li>Pads : Démarrer = <strong>' + (c.padStart === null ? 'non assigné' : 'note ' + c.padStart) + '</strong> · ' +
+      'Recommencer = <strong>' + (c.padRestart === null ? 'non assigné' : 'note ' + c.padRestart) + '</strong> · ' +
+      'Quitter = <strong>' + (c.padQuit === null ? 'non assigné' : 'note ' + c.padQuit) + '</strong></li>';
     const lx = $('btn-learn-x'), ly = $('btn-learn-y'), la = $('btn-learn-auto');
     if (MidiRig.learn === 'x') lx.textContent = '… tournez une manivelle pour X';
     else lx.textContent = 'Apprendre la manivelle X';
@@ -138,6 +141,12 @@
     if (MidiRig.learn === 'auto') la.textContent = '… 1ʳᵉ manivelle = X, 2ᵉ = Y';
     else la.textContent = 'Apprentissage auto (X puis Y)';
     $('btn-calib').textContent = MidiRig.calib ? 'Terminer la calibration des butées' : 'Calibrer les butées (balayer X et Y)';
+    const pads = [['btn-pad-start', 'start', 'Démarrer'], ['btn-pad-restart', 'restart', 'Recommencer'], ['btn-pad-quit', 'quit', 'Quitter']];
+    for (const [id, key, label] of pads) {
+      $(id).textContent = MidiRig.learnPad === key
+        ? '… appuyez sur un pad pour « ' + label + ' »'
+        : 'Apprendre le pad « ' + label + ' »';
+    }
     $('opt-mode').value = c.mode;
     $('opt-invx').checked = c.invX;
     $('opt-invy').checked = c.invY;
@@ -495,6 +504,12 @@
     Controls.cb.stop = () => { if (state.screen === 'run') quitRun(); };
 
     MidiRig.cb.crank = (axis, v) => Controls.setCrank(axis, v);
+    MidiRig.cb.action = (name) => {
+      if (state.screen !== 'run') return;
+      if (name === 'start') { if (state.run && state.run.phase === 'idle') beginCountdown(); }
+      else if (name === 'restart') { if (state.current) startRun(state.current.exercice, state.current.niveau); }
+      else if (name === 'quit') { quitRun(); }
+    };
     MidiRig.cb.status = (txt) => { $('midi-status').textContent = txt; };
     MidiRig.cb.mapping = () => { if (state.screen === 'setup') renderMappingInfo(); };
     MidiRig.cb.raw = (txt) => {
@@ -528,6 +543,9 @@
       renderMappingInfo();
     });
     $('btn-midi-reset').addEventListener('click', () => { MidiRig.reset(); renderMappingInfo(); });
+    $('btn-pad-start').addEventListener('click', () => { MidiRig.setLearnPad('start'); renderMappingInfo(); });
+    $('btn-pad-restart').addEventListener('click', () => { MidiRig.setLearnPad('restart'); renderMappingInfo(); });
+    $('btn-pad-quit').addEventListener('click', () => { MidiRig.setLearnPad('quit'); renderMappingInfo(); });
     $('opt-mode').addEventListener('change', (e) => { MidiRig.config.mode = e.target.value; MidiRig.config.modeExplicite = true; MidiRig.save(); });
     $('opt-invx').addEventListener('change', (e) => { MidiRig.config.invX = e.target.checked; MidiRig.save(); });
     $('opt-invy').addEventListener('change', (e) => { MidiRig.config.invY = e.target.checked; MidiRig.save(); });
