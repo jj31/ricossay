@@ -3,6 +3,7 @@
 
   const L = window.RicoLogic;
   const MidiRig = window.MidiRig;
+  const BleRig = window.BleRig;
   const Controls = window.Controls;
 
   const LS_HISTORY = 'ricochay.history.v1';
@@ -152,6 +153,8 @@
     $('opt-invy').checked = c.invY;
     $('opt-sens').value = c.sensibilite;
     $('opt-sens-val').textContent = Number(c.sensibilite).toFixed(2);
+    $('opt-sens-ble').value = BleRig.sens;
+    $('opt-sens-ble-val').textContent = BleRig.sens.toFixed(2);
   }
 
   function renderSeuilsEditor() {
@@ -503,26 +506,43 @@
     Controls.cb.start = () => { if (state.screen === 'run' && state.run && state.run.phase === 'idle') beginCountdown(); };
     Controls.cb.stop = () => { if (state.screen === 'run') quitRun(); };
 
-    MidiRig.cb.crank = (axis, v) => Controls.setCrank(axis, v);
-    MidiRig.cb.action = (name) => {
+    function handlePadAction(name) {
       if (state.screen !== 'run') return;
       if (name === 'start') { if (state.run && state.run.phase === 'idle') beginCountdown(); }
       else if (name === 'restart') { if (state.current) startRun(state.current.exercice, state.current.niveau); }
       else if (name === 'quit') { quitRun(); }
-    };
-    MidiRig.cb.status = (txt) => { $('midi-status').textContent = txt; };
-    MidiRig.cb.mapping = () => { if (state.screen === 'setup') renderMappingInfo(); };
-    MidiRig.cb.raw = (txt) => {
+    }
+    function handleBleAction(name) {
+      if (state.screen !== 'run') return;
+      if (name === 'start') {
+        if (state.run && state.run.phase === 'idle') beginCountdown();
+        else if (state.current) startRun(state.current.exercice, state.current.niveau);
+      } else if (name === 'quit') { quitRun(); }
+    }
+    function pushMonitor(txt) {
       const ul = $('midi-monitor');
       const li = document.createElement('li');
       li.textContent = txt;
       ul.prepend(li);
       while (ul.children.length > 8) ul.removeChild(ul.lastChild);
-    };
+    }
+    MidiRig.cb.crank = (axis, v) => Controls.setCrank(axis, v);
+    MidiRig.cb.action = handlePadAction;
+    BleRig.cb.crank = (axis, v) => Controls.setCrank(axis, v);
+    BleRig.cb.action = handleBleAction;
+    BleRig.cb.status = (txt) => { $('ble-status').textContent = txt; };
+    BleRig.cb.raw = pushMonitor;
+    MidiRig.cb.status = (txt) => { $('midi-status').textContent = txt; };
+    MidiRig.cb.mapping = () => { if (state.screen === 'setup') renderMappingInfo(); };
+    MidiRig.cb.raw = pushMonitor;
 
     $('btn-midi-connect').addEventListener('click', async () => {
       $('midi-status').textContent = 'Demande d\'accès MIDI…';
       await MidiRig.connect();
+    });
+    $('btn-ble-connect').addEventListener('click', async () => {
+      $('ble-status').textContent = 'BLE : connexion…';
+      await BleRig.connect();
     });
     $('btn-setup').addEventListener('click', () => show('setup'));
     $('btn-history').addEventListener('click', () => show('history'));
@@ -559,6 +579,11 @@
       $('opt-sens-val').textContent = MidiRig.config.sensibilite.toFixed(2);
       MidiRig.save();
     });
+    $('opt-sens-ble').addEventListener('input', (e) => {
+      BleRig.sens = Number(e.target.value);
+      $('opt-sens-ble-val').textContent = BleRig.sens.toFixed(2);
+      BleRig.save();
+    });
 
     $('btn-start').addEventListener('click', beginCountdown);
     $('btn-pause').addEventListener('click', togglePause);
@@ -592,6 +617,9 @@
       $('midi-status').textContent = 'Web MIDI indisponible : ouvrez la page avec Chrome/Edge en localhost ou HTTPS, puis reconnectez.';
     } else {
       MidiRig.connect();
+    }
+    if (!BleRig.supported) {
+      $('ble-status').textContent = 'BLE : Web Bluetooth indisponible (Chrome/Edge, page en localhost ou HTTPS).';
     }
 
     buildMenu();

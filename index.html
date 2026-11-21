@@ -13,12 +13,14 @@
   <p class="subtitle">Poursuite bimanuelle à deux manivelles — entraînement type épreuve psychomotrice (APC mk2 en USB / Web MIDI)</p>
   <div class="toolbar">
     <button id="btn-midi-connect" class="btn">Reconnecter MIDI</button>
+    <button id="btn-ble-connect" class="btn">Connecter ESP32 (BLE)</button>
     <button id="btn-setup" class="btn">Apprendre / calibrer les boutons</button>
     <button id="btn-history" class="btn">Historique</button>
     <label class="chk"><input type="checkbox" id="chk-virtual"> Manivelles à l'écran</label>
     <label class="chk"><input type="checkbox" id="chk-son" checked> Son (bip au bord de la piste)</label>
   </div>
   <div id="midi-status" class="midi-status">MIDI : initialisation…</div>
+  <div id="ble-status" class="midi-status">BLE : non connecté (ESP32-C6 + 2 KY-040 — voir firmware/)</div>
 </header>
 
 <main>
@@ -79,13 +81,22 @@
             <input type="range" id="opt-sens" min="0.2" max="3" step="0.1" value="1">
             <span id="opt-sens-val">1.00</span>
           </label>
+          <label>Sensibilité BLE (KY-040, pas de quadrature) :
+            <input type="range" id="opt-sens-ble" min="0.2" max="3" step="0.1" value="1">
+            <span id="opt-sens-ble-val">1.00</span>
+          </label>
         </div>
         <h3>Seuils des classes (stanines)</h3>
         <div id="seuils-editor" class="seuils-editor"></div>
       </div>
       <div class="panel">
-        <h3>Moniteur MIDI (derniers messages)</h3>
+        <h3>Moniteur (derniers messages MIDI / BLE)</h3>
         <ul id="midi-monitor" class="monitor"></ul>
+        <p class="aide">Interface BLE alternative : ESP32-C6 + 2 encodeurs KY-040.
+          Firmware Arduino dans <code>firmware/esp32c6-ky040/</code> (service Nordic UART,
+          protocole binaire 2 octets : [0,d]=X, [1,d]=Y, [2,1]=bouton X, [3,1]=bouton Y).
+          Bouton « Connecter ESP32 (BLE) » en haut de page ; SW X = Démarrer/Recommencer,
+          SW Y = Quitter.</p>
       </div>
     </div>
     <div class="btn-row"><button id="btn-back-menu" class="btn">Retour au menu</button></div>
@@ -150,6 +161,7 @@
 
 <script src="js/logic.js"></script>
 <script src="js/midi.js"></script>
+<script src="js/ble.js"></script>
 <script src="js/controls.js"></script>
 <script src="js/app.js"></script>
 </body>
