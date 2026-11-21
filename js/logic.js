@@ -36,6 +36,22 @@
     d -= e; return [-h, lerp(h, -h, d / e)];
   }
 
+  // Spline de Catmull-Rom passant par les points de contrôle (courbe paramétrée t -> [x, y]).
+  function catmullRom(pts) {
+    return function (t) {
+      const n = pts.length - 1;
+      let i = Math.floor(t * n);
+      if (i > n - 1) i = n - 1;
+      const f = t * n - i;
+      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(n, i + 2)];
+      const f2 = f * f, f3 = f2 * f;
+      return [
+        0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * f + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * f2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * f3),
+        0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * f + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * f2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * f3),
+      ];
+    };
+  }
+
   // Coordonnées normalisées : x et y dans [-1, 1], y vers le haut.
   const EXERCICES = [
     { id: 'ligne-h', nom: 'Ligne horizontale', desc: 'Suivi d\'une ligne droite horizontale.', fermee: false,
@@ -59,6 +75,11 @@
       } },
     { id: 'lissajous', nom: 'Lissajous 3:2', desc: 'Courbe complexe à boucles multiples.', fermee: true,
       courbe: (t) => [0.8 * Math.sin(3 * TAU * t + Math.PI / 2), 0.7 * Math.sin(2 * TAU * t)] },
+    { id: 'boucle', nom: 'Boucle ouverte (goutte)', desc: 'Boucle en goutte ouverte en bas à droite (d\'après image de référence).', fermee: false,
+      courbe: catmullRom([
+        [0.6, -0.6], [0.4, -0.2], [0.2, 0.2], [0.0, 0.6], [-0.2, 0.8], [-0.4, 0.6],
+        [-0.6, 0.2], [-0.4, -0.2], [-0.2, -0.4], [0.0, -0.6], [0.2, -0.8], [0.4, -0.6],
+      ]) },
   ];
 
   // Échantillonne une courbe paramétrique et précalcule les longueurs d'arc.
@@ -131,7 +152,8 @@
       this.n = 0;
       this.maxDist = 0;
       this.dernierDistPx = 0;
-      this.maxIndex = 0;
+      this.progression = 0;   // indice "déroulé" le long du circuit (unités d'échantillons)
+      this.prevIndex = null;
       this.couvert = new Uint8Array(this.courbe.pts.length);
       this.couvertN = 0;
     }
@@ -177,16 +199,26 @@
         this.motif = 'duree';
       }
     }
-    // Arrivée : extrémité du tracé (courbe ouverte), ou retour au départ après
-    // avoir parcouru plus de la moitié du circuit (courbe fermée = 1 tour).
+    // Arrivée : extrémité du tracé (courbe ouverte), ou un tour complet pour les
+    // circuits fermés. Pour les fermées, on accumule la progression "déroulée" :
+    // un saut d'indice > la moitié de la longueur = passage par le bouclage.
+    // Un retour en arrière ou une dérive hors piste ne déclenchent PAS l'arrivée.
     _arrivee(user, index) {
       const pts = this.courbe.pts;
+      const len = pts.length;
       if (!this.exercice.fermee) {
-        const fin = pts[pts.length - 1];
+        const fin = pts[len - 1];
         return Math.hypot(user.x - fin[0], user.y - fin[1]) * this.echelle <= this.niveau.tolerance;
       }
-      if (index > this.maxIndex) this.maxIndex = index;
-      return this.maxIndex > pts.length * 0.5 && index < pts.length * 0.1;
+      if (this.prevIndex !== null) {
+        // Seul un vrai passage par le bouclage (haut -> bas de l'échantillonnage)
+        // ajoute un tour ; un retour en arrière ou une dérive ne comptent pas.
+        if (this.prevIndex > len * 0.8 && index < len * 0.2) this.progression += len;
+        else if (this.prevIndex < len * 0.2 && index > len * 0.8) this.progression -= len;
+        else this.progression += index - this.prevIndex;
+      }
+      this.prevIndex = index;
+      return this.progression >= len * 0.98;
     }
     stats() {
       const pct = this.temps > 0 ? Math.min(100, (100 * this.tempsSur) / this.temps) : 0;

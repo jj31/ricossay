@@ -45,5 +45,22 @@ ok(C.crankX < 0, 'manivelle X non bornée (peut descendre sous 0), crankX=' + C.
 ok(C.point.x === -1, 'seul le point est borné au bord du plateau (-1)');
 C.keys['ArrowLeft'] = false;
 
+console.log('Inversion des axes (niveau Controls : toutes sources MIDI/BLE/clavier)');
+C.invY = true;
+C.anchor(0, 0);
+C.setCrank('y', 0.6);
+ok(C.point.y < 0, 'invY : manivelle Y vers le haut -> point vers le bas (inversé)');
+C.setCrank('y', 0.4);
+ok(C.point.y > 0, 'manivelle Y vers le bas -> point vers le haut');
+C.setCrank('y', 0.5);
+ok(Math.abs(C.point.y) < 1e-12, 'manivelle au centre -> point au centre');
+C.setPointDirect(0, 0.5);
+C.setCrank('y', C.crankY);
+ok(Math.abs(C.point.y - 0.5) < 1e-12, 'souris + manivelle cohérents malgré l\'inversion');
+C.invY = false;
+C.anchor(0, 0);
+C.setCrank('y', 0.5);
+ok(Math.abs(C.point.y) < 1e-12, 'invY désactivé + ré-ancrage : comportement normal');
+
 console.log(echecs === 0 ? '\nTOUS LES TESTS PASSENT' : '\n' + echecs + ' ECHEC(S)');
 process.exit(echecs === 0 ? 0 : 1);

@@ -206,7 +206,7 @@
           const max = this.config['max' + axis.toUpperCase()];
           let norm = max > min ? (val - min) / (max - min) : val / 127;
           norm = Math.min(1, Math.max(0, norm));
-          if (this.config['inv' + axis.toUpperCase()]) norm = 1 - norm;
+          // L'inversion d'axe est gérée par Controls (s'applique à toutes les sources).
           this.crank[axis] = norm;
           this.cb.crank(axis, norm);
         }

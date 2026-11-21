@@ -63,7 +63,8 @@ python3 -m http.server 8080
    (Ou apprentissage manuel bouton par bouton.)
 4. Cliquer sur **« Calibrer les butées »** et balayer chaque bouton rotatif sur toute
    sa course, puis terminer : la course complète du bouton couvre alors tout l'écran.
-5. Options : inversion de X/Y, mode **relatif — réglage par défaut** (encodeurs
+5. Options : inversion de X/Y (s'applique à **toutes** les sources : MIDI, BLE, clavier),
+   mode **relatif — réglage par défaut** (encodeurs
    rotatifs infinis type MPK mini : **amplitude illimitée**, la manivelle virtuelle
    n'est pas bornée — seul le point est limité par les bords de l'écran ; gère les
    conventions 1/127, wrap absolu 127→0 et 65/63) ou **position absolue**
@@ -112,7 +113,8 @@ protocole) — seule la carte change dans l'IDE.
 ## Exercices et niveaux de difficulté
 
 9 trajectoires : ligne horizontale, ligne verticale, diagonale, cercle, ellipse,
-sinusoïde, carré (angles), huit (lemniscate), Lissajous 3:2. Les courbes ouvertes
+sinusoïde, carré (angles), huit (lemniscate), Lissajous 3:2, **boucle ouverte en goutte**
+(d'après image de référence, spline de Catmull-Rom). Les courbes ouvertes
 sont parcourues en aller-retour ; les fermées en boucle.
 
 Chaque exercice propose **3 niveaux** :

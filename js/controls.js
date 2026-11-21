@@ -12,6 +12,8 @@
     crankY: 0.5,
     origin: { x: 0, y: 0 },          // position du point quand les manivelles sont à leur origine
     crankOrigin: { x: 0.5, y: 0.5 },  // valeurs des manivelles à l'ancrage
+    invX: false,                     // inversion des axes (toutes sources : MIDI, BLE, clavier)
+    invY: false,
     point: { x: 0, y: 0 },
     keySpeed: 0.6, // fraction de la plage par seconde avec les flèches
     keys: {},
@@ -53,13 +55,17 @@
     setPointDirect(x, y) {
       this.point.x = Math.min(1, Math.max(-1, x));
       this.point.y = Math.min(1, Math.max(-1, y));
-      this.crankOrigin.x = this.crankX - (this.point.x - this.origin.x) / 2;
-      this.crankOrigin.y = this.crankY - (this.point.y - this.origin.y) / 2;
+      const sx = this.invX ? -1 : 1;
+      const sy = this.invY ? -1 : 1;
+      this.crankOrigin.x = this.crankX - (this.point.x - this.origin.x) / (2 * sx);
+      this.crankOrigin.y = this.crankY - (this.point.y - this.origin.y) / (2 * sy);
     },
 
     applyPoint() {
-      this.point.x = Math.min(1, Math.max(-1, this.origin.x + (this.crankX - this.crankOrigin.x) * 2));
-      this.point.y = Math.min(1, Math.max(-1, this.origin.y + (this.crankY - this.crankOrigin.y) * 2));
+      const sx = this.invX ? -1 : 1;
+      const sy = this.invY ? -1 : 1;
+      this.point.x = Math.min(1, Math.max(-1, this.origin.x + (this.crankX - this.crankOrigin.x) * 2 * sx));
+      this.point.y = Math.min(1, Math.max(-1, this.origin.y + (this.crankY - this.crankOrigin.y) * 2 * sy));
     },
 
     update(dt) {

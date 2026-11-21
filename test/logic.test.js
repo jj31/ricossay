@@ -11,7 +11,7 @@ function ok(cond, msg) {
 }
 
 console.log('Exercices et niveaux');
-ok(L.EXERCICES.length === 9, '9 exercices définis');
+ok(L.EXERCICES.length === 10, '10 exercices définis (dont la boucle ouverte d\'après image)');
 ok(L.NIVEAUX.length === 3, '3 niveaux de difficulté');
 ok(L.NIVEAUX[2].duree === 120, 'niveau 3 = essai standard de 2 minutes (120 s)');
 ok(L.NIVEAUX[0].tolerance > L.NIVEAUX[1].tolerance && L.NIVEAUX[1].tolerance > L.NIVEAUX[2].tolerance,
@@ -141,6 +141,59 @@ console.log('Arrivée : un tour complet (courbe fermée)');
   const st = sim.stats();
   ok(sim.termine && st.motif === 'arrivee', 'essai arrêté après le tour complet (motif=' + st.motif + ', temps=' + st.temps.toFixed(2) + ' s)');
   ok(st.couverturePct > 90, 'progression ~100 % du tour (' + st.couverturePct.toFixed(1) + ' %)');
+}
+
+console.log('Pas de fausse arrivée : retour en arrière sur circuit fermé');
+{
+  const ex = L.EXERCICES.find((e) => e.id === 'cercle');
+  const niv = L.NIVEAUX[0]; // 60 s
+  const sim = new L.RunSim({ exercice: ex, niveau: niv, echelle: 270 });
+  const dt = 1 / 60;
+  const aller = (s0, s1, duree) => {
+    const steps = Math.round(duree / dt);
+    for (let k = 1; k <= steps && !sim.termine; k++) {
+      const s = s0 + (s1 - s0) * (k / steps);
+      const p = L.pointSurCourbe(sim.courbe, s);
+      sim.update(dt, { x: p[0], y: p[1] });
+    }
+  };
+  aller(0, sim.L * 0.6, 6);   // 60 % du tour en avant
+  aller(sim.L * 0.6, 0, 6);   // retour au départ (pas un tour complet)
+  ok(!sim.termine, 'après 60 % + retour au départ : pas d\'arrivée (termine=' + sim.termine + ')');
+  aller(0, sim.L, 10);        // maintenant le tour complet
+  const st = sim.stats();
+  ok(sim.termine && st.motif === 'arrivee', 'arrivée seulement après le tour complet (motif=' + st.motif + ')');
+}
+
+console.log('Pas de fausse arrivée : dérive hors piste au milieu du circuit');
+{
+  const ex = L.EXERCICES.find((e) => e.id === 'cercle');
+  const niv = L.NIVEAUX[0];
+  const sim = new L.RunSim({ exercice: ex, niveau: niv, echelle: 270 });
+  const dt = 1 / 60;
+  let t = 0;
+  const suivre = (s, duree) => {
+    const steps = Math.round(duree / dt);
+    for (let k = 1; k <= steps && !sim.termine; k++) {
+      const p = L.pointSurCourbe(sim.courbe, s + (sim.L * 0.6) * (k / steps));
+      sim.update(dt, { x: p[0], y: p[1] });
+    }
+  };
+  suivre(0, 6); // 60 % du tour
+  // dérive au centre (hors piste, indice le plus proche quelconque)
+  for (let k = 0; k < 600 && !sim.termine; k++) sim.update(dt, { x: 0, y: 0 });
+  ok(!sim.termine, 'dérive au centre après 60 % : pas d\'arrivée (termine=' + sim.termine + ', progression=' + sim.progression.toFixed(0) + ')');
+}
+
+console.log('Nouvel exercice "boucle" (image de référence)');
+{
+  const ex = L.EXERCICES.find((e) => e.id === 'boucle');
+  ok(!!ex && ex.fermee === false, 'exercice boucle présent, courbe ouverte');
+  const c = L.echantillonner(ex.courbe, false, 800);
+  const p0 = L.pointSurCourbe(c, 0), p1 = L.pointSurCourbe(c, c.total);
+  ok(Math.abs(p0[0] - 0.6) < 0.05 && Math.abs(p0[1] + 0.6) < 0.05, 'départ en bas à droite (~0.6, -0.6)');
+  ok(Math.abs(p1[0] - 0.4) < 0.05 && Math.abs(p1[1] + 0.6) < 0.05, 'arrivée près du départ (~0.4, -0.6), écart ~54 px > tol N1');
+  ok(Math.abs(p0[0] - p1[0]) * 270 > L.NIVEAUX[0].tolerance, 'pas de fausse arrivée au départ (écart départ/arrivée > tolérance N1)');
 }
 
 console.log('Sans arrivée : l\'essai va jusqu\'à la durée max');

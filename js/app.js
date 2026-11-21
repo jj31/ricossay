@@ -502,6 +502,8 @@
   // ---------- câblage ----------
   function init() {
     Controls.init();
+    Controls.invX = !!MidiRig.config.invX;
+    Controls.invY = !!MidiRig.config.invY;
     Controls.cb.pause = () => { if (state.screen === 'run') togglePause(); };
     Controls.cb.start = () => { if (state.screen === 'run' && state.run && state.run.phase === 'idle') beginCountdown(); };
     Controls.cb.stop = () => { if (state.screen === 'run') quitRun(); };
@@ -572,8 +574,8 @@
       MidiRig.last.x = null; MidiRig.last.y = null;
       MidiRig.save();
     });
-    $('opt-invx').addEventListener('change', (e) => { MidiRig.config.invX = e.target.checked; MidiRig.save(); });
-    $('opt-invy').addEventListener('change', (e) => { MidiRig.config.invY = e.target.checked; MidiRig.save(); });
+    $('opt-invx').addEventListener('change', (e) => { MidiRig.config.invX = e.target.checked; Controls.invX = e.target.checked; MidiRig.save(); });
+    $('opt-invy').addEventListener('change', (e) => { MidiRig.config.invY = e.target.checked; Controls.invY = e.target.checked; MidiRig.save(); });
     $('opt-sens').addEventListener('input', (e) => {
       MidiRig.config.sensibilite = Number(e.target.value);
       $('opt-sens-val').textContent = MidiRig.config.sensibilite.toFixed(2);

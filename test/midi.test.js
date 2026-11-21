@@ -52,9 +52,9 @@ cc(48, 127); ok(rec[0] === 'x' && Math.abs(rec[1] - 1) < 1e-9, 'CC max -> manive
 cc(48, 0); ok(Math.abs(rec[1]) < 1e-9, 'CC min -> manivelle à 0');
 cc(48, 64); ok(Math.abs(rec[1] - 64 / 127) < 1e-9, 'CC 64 -> ~0.504');
 M.config.invX = true;
-cc(48, 0); ok(Math.abs(rec[1] - 1) < 1e-9, 'inversion X : CC min -> 1');
+cc(48, 0); ok(Math.abs(rec[1]) < 1e-9, 'inversion gérée côté Controls : au niveau MIDI, CC min -> 0 (pas de double inversion)');
 M.config.invX = false;
-cc(99, 10); ok(rec[0] === 'x' && Math.abs(rec[1] - 1) < 1e-9, 'CC non assigné (99) ignoré');
+cc(99, 10); ok(rec[0] === 'x' && Math.abs(rec[1]) < 1e-9, 'CC non assigné (99) ignoré (dernier crank X inchangé = 0)');
 
 console.log('Calibration des butées');
 M.config.minX = 0; M.config.maxX = 127;
