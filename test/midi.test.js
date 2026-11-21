@@ -22,7 +22,8 @@ const cc = (n, v) => M.handleMessage({ data: [0xB0, n, v] });
 
 console.log('Valeurs par défaut');
 ok(M.config.ccX === 48 && M.config.ccY === 49, 'CC par défaut 48 (X) et 49 (Y)');
-ok(M.config.mode === 'position', 'mode position par défaut');
+ok(M.config.mode === 'relatif', 'mode relatif par défaut (encodeurs infinis, sans butées)');
+ok(M.config.sensibilite === 1.5, 'sensibilité par défaut 1.5');
 
 console.log('Apprentissage manuel');
 M.setLearn('x');
@@ -41,9 +42,9 @@ ok(M.config.ccY !== 20 && M.learn === 'auto', 'même bouton à nouveau : toujour
 cc(21, 5);
 ok(M.config.ccY === 21 && M.learn === null, '2e bouton différent -> Y, apprentissage terminé');
 
-console.log('Mode position absolue + inversion');
+console.log('Mode position absolue + inversion (si potentiomètres avec butées)');
 M.config.ccX = 48; M.config.ccY = 49;
-M.config.mode = 'position';
+M.config.mode = 'position'; M.config.modeExplicite = true;
 M.config.minX = 0; M.config.maxX = 127; M.config.invX = false;
 let rec = null;
 M.cb.crank = (axis, v) => { rec = [axis, v]; };
@@ -79,6 +80,13 @@ M.config.mode = 'position';
 
 console.log('Persistance');
 ok(store['ricochay.config.v1'] && JSON.parse(store['ricochay.config.v1']).ccX === 48, 'config sauvegardée dans localStorage');
+
+console.log('Migration : ancienne config (sans modeExplicite) -> mode relatif, CC appris conservés');
+store['ricochay.config.v1'] = JSON.stringify({ inputName: 'MPK mini', ccX: 55, ccY: 56, mode: 'position', sensibilite: 1 });
+M.load();
+ok(M.config.mode === 'relatif', 'mode forcé en relatif (encodeurs infinis, plus de butées)');
+ok(M.config.ccX === 55 && M.config.ccY === 56 && M.config.inputName === 'MPK mini', 'CC appris et entrée conservés');
+M.config.ccX = 48; M.config.ccY = 49; M.config.mode = 'relatif'; M.save();
 
 console.log(echecs === 0 ? '\nTOUS LES TESTS PASSENT' : '\n' + echecs + ' ECHEC(S)');
 process.exit(echecs === 0 ? 0 : 1);

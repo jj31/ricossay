@@ -10,6 +10,9 @@ Application web d'entraînement à l'épreuve dite **de Ricochay** : deux manive
 orthogonales (X horizontal, Y vertical) déplacent un point à l'écran, et le sujet
 doit **parcourir le tracé sans en sortir** : le point **démarre au début de la
 trajectoire** et chaque sortie de piste est détectée et comptabilisée.
+L'essai **s'arrête dès l'arrivée** (extrémité du tracé, ou un tour complet pour les
+circuits fermés). Un **bip** retentit quand le point touche le bord de la piste
+(WebAudio, case « Son » en haut de page).
 
 Les deux manivelles sont les **boutons rotatifs (encodeurs) d'un Akai APC mk2**,
 connecté en USB et lu via l'**API Web MIDI** du navigateur. L'application prévoit
@@ -60,8 +63,10 @@ python3 -m http.server 8080
    (Ou apprentissage manuel bouton par bouton.)
 4. Cliquer sur **« Calibrer les butées »** et balayer chaque bouton rotatif sur toute
    sa course, puis terminer : la course complète du bouton couvre alors tout l'écran.
-5. Options : inversion de X/Y, mode **position absolue** (potentiomètres de l'APC,
-   réglage par défaut) ou **relatif** (encodeurs à impulsions), sensibilité.
+5. Options : inversion de X/Y, mode **relatif — réglage par défaut** (encodeurs
+   rotatifs infinis type MPK mini : aucun butée, le point n'est limité que par les
+   bords de l'écran) ou **position absolue** (potentiomètres avec butées), et la
+   sensibilité (gain du mode relatif).
 
 Rappels de mapping usine de l'APC mini mk2 (canal 1) : pads = notes 0–63,
 faders = CC 48–55 (+ master 56), boutons track/scene = notes 100–107 / 112–119.
@@ -96,7 +101,7 @@ Chaque exercice propose **3 niveaux** :
 
 - Score = **% du temps avec le point dans la zone de tolérance autour du tracé** (la piste).
 - Statistiques : sorties de piste (transitions hors zone), écart moyen/max à la piste,
-  progression = % du tracé parcouru.
+  progression = % du tracé parcouru, temps mis et motif d'arrêt (**arrivée** ou **durée max**).
 - **Classe 1–9** via les seuils modifiables (défaut : 82/78/74/70/65/60/52/42 %).
 - Historique local (`localStorage`, 500 essais), meilleur score affiché (★) par
   exercice/niveau, **export CSV**.
@@ -116,7 +121,7 @@ test/*.test.js      tests Node (aucun framework requis)
 ## Tests
 
 ```bash
-node test/logic.test.js     # trajectoires, point de départ, distance à la piste, scoring, classes
+node test/logic.test.js     # trajectoires, point de départ, distance à la piste, arrêt à l'arrivée, scoring, classes
 node test/midi.test.js      # apprentissage CC, calibration, modes position/relatif
 node test/controls.test.js  # manivelles -> point, clavier, souris
 ```

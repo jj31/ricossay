@@ -12,8 +12,11 @@
     minX: 0, maxX: 127,
     minY: 0, maxY: 127,
     invX: false, invY: false,
-    mode: 'position',      // 'position' (CC absolu) ou 'relatif' (encodeur à impulsions)
-    sensibilite: 1.0,      // gain du mode relatif
+    // Encodeurs rotatifs infinis (MPK mini / APC) : mode relatif par défaut,
+    // sans butées. 'position' ne sert que pour des potentiomètres avec butées.
+    mode: 'relatif',
+    modeExplicite: true,   // false tant que l'utilisateur n'a pas choisi le mode
+    sensibilite: 1.5,      // gain du mode relatif
   };
 
   const MidiRig = {
@@ -37,7 +40,17 @@
     load() {
       try {
         const raw = localStorage.getItem(LS_KEY);
-        if (raw) this.config = Object.assign({}, DEFAULTS, JSON.parse(raw));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          this.config = Object.assign({}, DEFAULTS, parsed);
+          // Migration : une ancienne config (avant le choix explicite du mode)
+          // passait en mode relatif, sans butées, en conservant les CC appris.
+          if (!('modeExplicite' in parsed)) {
+            this.config.mode = 'relatif';
+            this.config.modeExplicite = true;
+            this.save();
+          }
+        }
       } catch (e) { /* config corrompue : on repart des défauts */ }
     },
     save() {

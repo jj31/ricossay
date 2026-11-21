@@ -61,16 +61,16 @@ console.log('RunSim : tracé parfait');
   const dt = 1 / 120;
   let t = 0;
   while (!sim.termine && t < niv.duree + 1) {
-    const s = sim.L * Math.min(1, t / niv.duree); // un tour complet sur la durée
+    const s = sim.L * 0.4 * Math.min(1, t / niv.duree); // 40 % du tour : pas d'arrivée
     const p = L.pointSurCourbe(sim.courbe, s);
     sim.update(dt, { x: p[0], y: p[1] });
     t += dt;
   }
   const st = sim.stats();
-  ok(sim.termine, 'essai terminé après la durée prévue');
+  ok(sim.termine && st.motif === 'duree', 'essai allé jusqu\'à la durée prévue (motif=' + st.motif + ')');
   ok(Math.abs(st.pct - 100) < 1e-9, 'tracé parfait => 100 % du temps sur la piste (' + st.pct + ')');
   ok(st.sorties === 0, 'aucune sortie');
-  ok(st.couverturePct > 95, 'progression ~100 % du tracé parcouru (' + st.couverturePct.toFixed(1) + ' %)');
+  ok(st.couverturePct > 35 && st.couverturePct < 45, 'progression ~40 % du tracé parcouru (' + st.couverturePct.toFixed(1) + ' %)');
   ok(Math.abs(st.temps - niv.duree) < 1e-6, 'durée mesurée = durée configurée');
 }
 
@@ -105,6 +105,55 @@ console.log('RunSim : sorties comptabilisées aux transitions hors piste');
   const st = sim.stats();
   ok(st.sorties >= 10, 'sortie détectée à chaque passage hors piste (' + st.sorties + ')');
   ok(st.pct > 30 && st.pct < 70, 'environ 50 % du temps sur la piste (' + st.pct.toFixed(1) + ' %)');
+}
+
+console.log('Arrivée : arrêt à l\'extrémité du tracé (courbe ouverte)');
+{
+  const ex = L.EXERCICES.find((e) => e.id === 'ligne-h');
+  const niv = L.NIVEAUX[0]; // 60 s, tol 26 px
+  const sim = new L.RunSim({ exercice: ex, niveau: niv, echelle: 270 });
+  const dt = 1 / 60;
+  let t = 0;
+  while (!sim.termine && t < niv.duree + 1) {
+    const x = Math.min(0.85, -0.85 + 1.7 * (t / 10)); // atteint l'extrémité (0.85, 0) en 10 s
+    sim.update(dt, { x, y: 0 });
+    t += dt;
+  }
+  const st = sim.stats();
+  ok(sim.termine && st.motif === 'arrivee' && st.arrivee, 'essai arrêté à l\'arrivée (motif=' + st.motif + ')');
+  ok(st.temps > 8 && st.temps < 11 && st.temps < niv.duree, 'arrêt à l\'arrivée (~10 s, dès qu\'on est à tolérance de l\'extrémité), bien avant les 60 s (temps=' + st.temps.toFixed(2) + ')');
+  ok(Math.abs(st.pct - 100) < 1e-9 && st.sorties === 0, 'tracé sur la piste pendant tout le trajet => 100 %, 0 sortie');
+}
+
+console.log('Arrivée : un tour complet (courbe fermée)');
+{
+  const ex = L.EXERCICES.find((e) => e.id === 'cercle');
+  const niv = L.NIVEAUX[0];
+  const sim = new L.RunSim({ exercice: ex, niveau: niv, echelle: 270 });
+  const dt = 1 / 60;
+  let t = 0;
+  while (!sim.termine && t < niv.duree + 1) {
+    const s = Math.min(sim.L, sim.L * (t / 8)); // un tour en 8 s
+    const p = L.pointSurCourbe(sim.courbe, s);
+    sim.update(dt, { x: p[0], y: p[1] });
+    t += dt;
+  }
+  const st = sim.stats();
+  ok(sim.termine && st.motif === 'arrivee', 'essai arrêté après le tour complet (motif=' + st.motif + ', temps=' + st.temps.toFixed(2) + ' s)');
+  ok(st.couverturePct > 90, 'progression ~100 % du tour (' + st.couverturePct.toFixed(1) + ' %)');
+}
+
+console.log('Sans arrivée : l\'essai va jusqu\'à la durée max');
+{
+  const ex = L.EXERCICES.find((e) => e.id === 'cercle');
+  const niv = L.NIVEAUX[0];
+  const sim = new L.RunSim({ exercice: ex, niveau: niv, echelle: 270 });
+  const dt = 1 / 60;
+  let t = 0;
+  while (!sim.termine && t < niv.duree + 1) { sim.update(dt, { x: sim.start[0], y: sim.start[1] }); t += dt; }
+  const st = sim.stats();
+  ok(sim.termine && st.motif === 'duree' && !st.arrivee, 'motif=duree, temps = ' + st.temps.toFixed(1) + ' s');
+  ok(st.pct === 100 && st.sorties === 0, 'point immobile sur la piste : 100 % plafonné, 0 sortie (pct=' + st.pct + ')');
 }
 
 console.log('Classes (stanines)');

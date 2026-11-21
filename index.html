@@ -16,6 +16,7 @@
     <button id="btn-setup" class="btn">Apprendre / calibrer les boutons</button>
     <button id="btn-history" class="btn">Historique</button>
     <label class="chk"><input type="checkbox" id="chk-virtual"> Manivelles à l'écran</label>
+    <label class="chk"><input type="checkbox" id="chk-son" checked> Son (bip au bord de la piste)</label>
   </div>
   <div id="midi-status" class="midi-status">MIDI : initialisation…</div>
 </header>
@@ -29,6 +30,9 @@
       <strong>sans sortir de la piste</strong> (bande bleue = tolérance). Chaque sortie de piste est détectée
       et comptabilisée. Le score est le <strong>pourcentage du temps passé sur la trajectoire</strong>,
       converti en classe 1–9. Niveau 3 = essai de 2 minutes, comme l'épreuve standard.
+      L'essai s'arrête dès que vous atteignez <strong>l'arrivée</strong> (extrémité du tracé,
+      ou un tour complet pour les circuits fermés — marqueur orange). Un bip retentit quand
+      vous touchez le bord de la piste, et un autre quand vous en sortez.
       Sans APC : flèches du clavier / WASD, ou souris directement sur le plateau.
     </p>
     <div id="exercise-grid" class="grid"></div>
@@ -128,7 +132,7 @@
     </div>
     <table class="history">
       <thead>
-        <tr><th>Date</th><th>Exercice</th><th>Niv.</th><th>Durée</th><th>Tol.</th><th>% piste</th><th>Sorties</th><th>Progression</th><th>Classe</th></tr>
+        <tr><th>Date</th><th>Exercice</th><th>Niv.</th><th>Durée</th><th>Tol.</th><th>% piste</th><th>Sorties</th><th>Progression</th><th>Arrivée</th><th>Classe</th></tr>
       </thead>
       <tbody id="history-body"></tbody>
     </table>

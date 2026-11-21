@@ -126,9 +126,12 @@
       // Démarre "sur la piste" : un essai qui commence hors piste compte une sortie.
       this.dans = true;
       this.termine = false;
+      this.motif = null; // 'arrivee' | 'duree'
       this.sommeDist = 0;
       this.n = 0;
       this.maxDist = 0;
+      this.dernierDistPx = 0;
+      this.maxIndex = 0;
       this.couvert = new Uint8Array(this.courbe.pts.length);
       this.couvertN = 0;
     }
@@ -148,7 +151,16 @@
       if (this.termine) return;
       this.temps += dt;
       const d = this.distancePiste(user.x, user.y);
-      if (!this.couvert[d.index]) { this.couvert[d.index] = 1; this.couvertN++; }
+      this.dernierDistPx = d.distPx;
+      // Progression : portions du tracé vues à moins de la tolérance.
+      const tol2 = this.tolN * this.tolN;
+      const pts = this.courbe.pts;
+      for (let i = 0; i < pts.length; i++) {
+        if (!this.couvert[i]) {
+          const dx = user.x - pts[i][0], dy = user.y - pts[i][1];
+          if (dx * dx + dy * dy <= tol2) { this.couvert[i] = 1; this.couvertN++; }
+        }
+      }
       const sur = d.distPx <= this.niveau.tolerance;
       if (sur) this.tempsSur += dt;
       else if (this.dans) this.sorties++;
@@ -156,13 +168,28 @@
       this.sommeDist += d.distPx;
       this.n++;
       if (d.distPx > this.maxDist) this.maxDist = d.distPx;
-      if (this.temps >= this.duree) {
+      if (this._arrivee(user, d.index)) {
+        this.termine = true;
+        this.motif = 'arrivee';
+      } else if (this.temps >= this.duree) {
         this.temps = this.duree;
         this.termine = true;
+        this.motif = 'duree';
       }
     }
+    // Arrivée : extrémité du tracé (courbe ouverte), ou retour au départ après
+    // avoir parcouru plus de la moitié du circuit (courbe fermée = 1 tour).
+    _arrivee(user, index) {
+      const pts = this.courbe.pts;
+      if (!this.exercice.fermee) {
+        const fin = pts[pts.length - 1];
+        return Math.hypot(user.x - fin[0], user.y - fin[1]) * this.echelle <= this.niveau.tolerance;
+      }
+      if (index > this.maxIndex) this.maxIndex = index;
+      return this.maxIndex > pts.length * 0.5 && index < pts.length * 0.1;
+    }
     stats() {
-      const pct = this.temps > 0 ? (100 * this.tempsSur) / this.temps : 0;
+      const pct = this.temps > 0 ? Math.min(100, (100 * this.tempsSur) / this.temps) : 0;
       const couverturePct = (100 * this.couvertN) / this.courbe.pts.length;
       return {
         temps: this.temps,
@@ -175,6 +202,8 @@
         couverturePct,
         termine: this.termine,
         dans: this.dans,
+        motif: this.motif,
+        arrivee: this.motif === 'arrivee',
       };
     }
   }
