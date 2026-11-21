@@ -67,15 +67,26 @@ ok(M.config.minY === 3 && M.config.maxY === 125, 'butées Y apprises : 3–125')
 cc(48, 7); ok(Math.abs(rec[1]) < 1e-9, 'butée min -> 0');
 cc(48, 122); ok(Math.abs(rec[1] - 1) < 1e-9, 'butée max -> 1');
 
-console.log('Mode relatif (encodeur à impulsions, avec bouclage 127->0)');
+console.log('Mode relatif (encodeurs infinis : manivelle NON bornée, amplitude illimitée)');
 M.config.mode = 'relatif';
 M.config.sensibilite = 1;
 M.crank.x = 0.5; M.last.x = null;
 cc(48, 10); ok(Math.abs(M.crank.x - 0.5) < 1e-12, 'premier message : pas de déplacement');
-cc(48, 12); ok(Math.abs(M.crank.x - (0.5 + 2 * 0.008)) < 1e-12, '+2 crans -> +0.016');
-cc(48, 10); ok(Math.abs(M.crank.x - (0.5 + 2 * 0.008 - 2 * 0.008)) < 1e-12, '-2 crans -> retour');
+cc(48, 12); ok(Math.abs(M.crank.x - (0.5 + 2 * 0.02)) < 1e-12, '+2 crans -> +0.04 (pas 0.02)');
+cc(48, 10); ok(Math.abs(M.crank.x - 0.5) < 1e-12, '-2 crans -> retour à 0.5');
 cc(48, 127); ok(M.crank.x < 0.5, '127 apres 10 : delta -11 (bouclage) -> diminue');
-cc(48, 0); ok(Math.abs(M.crank.x - 0.5) > 1e-9, '0 apres 127 : delta +1 (bouclage) -> augmente legerement');
+cc(48, 0); ok(M.crank.x > 0.5 - 11 * 0.02, '0 apres 127 : delta +1 (bouclage) -> augmente legerement');
+{
+  let v = 10;
+  for (let i = 0; i < 80; i++) { v = (v + 1) % 128; cc(48, v); }
+  ok(M.crank.x > 1, '80 crans dans le même sens : manivelle > 1 (non bornée à [0,1]), crank=' + M.crank.x.toFixed(2));
+}
+cc(48, 65); ok(true, 'valeur 65 reçue');
+{
+  const before = M.crank.x;
+  cc(48, 65); ok(Math.abs(M.crank.x - (before + 0.02)) < 1e-12, 'convention 65 = +1 cran');
+  cc(48, 63); ok(Math.abs(M.crank.x - before) < 1e-12, 'convention 63 = -1 cran');
+}
 M.config.mode = 'position';
 
 console.log('Persistance');

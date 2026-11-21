@@ -439,8 +439,8 @@
     const box = $('virtual-cranks');
     box.classList.toggle('hidden', !state.showVirtualCranks);
     if (!state.showVirtualCranks) return;
-    $('vc-x').style.bottom = (Controls.crankX * 100) + '%';
-    $('vc-y').style.bottom = (Controls.crankY * 100) + '%';
+    $('vc-x').style.bottom = (Math.min(1, Math.max(0, Controls.crankX)) * 100) + '%';
+    $('vc-y').style.bottom = (Math.min(1, Math.max(0, Controls.crankY)) * 100) + '%';
   }
 
   function bindVirtualCrank(el, axis) {
@@ -546,7 +546,12 @@
     $('btn-pad-start').addEventListener('click', () => { MidiRig.setLearnPad('start'); renderMappingInfo(); });
     $('btn-pad-restart').addEventListener('click', () => { MidiRig.setLearnPad('restart'); renderMappingInfo(); });
     $('btn-pad-quit').addEventListener('click', () => { MidiRig.setLearnPad('quit'); renderMappingInfo(); });
-    $('opt-mode').addEventListener('change', (e) => { MidiRig.config.mode = e.target.value; MidiRig.config.modeExplicite = true; MidiRig.save(); });
+    $('opt-mode').addEventListener('change', (e) => {
+      MidiRig.config.mode = e.target.value;
+      MidiRig.config.modeExplicite = true;
+      MidiRig.last.x = null; MidiRig.last.y = null;
+      MidiRig.save();
+    });
     $('opt-invx').addEventListener('change', (e) => { MidiRig.config.invX = e.target.checked; MidiRig.save(); });
     $('opt-invy').addEventListener('change', (e) => { MidiRig.config.invY = e.target.checked; MidiRig.save(); });
     $('opt-sens').addEventListener('input', (e) => {

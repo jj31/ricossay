@@ -41,8 +41,8 @@ ok(Math.abs(C.point.x - (-0.5 + 0.3 * 2)) < 1e-12, 'point déplacé relativement
 C.keys['ArrowRight'] = false;
 C.keys['ArrowLeft'] = true;
 C.update(10);
-ok(C.crankX === 0, 'manivelle X bornée à 0');
-ok(C.point.x >= -1, 'point borné à -1 minimum');
+ok(C.crankX < 0, 'manivelle X non bornée (peut descendre sous 0), crankX=' + C.crankX.toFixed(2));
+ok(C.point.x === -1, 'seul le point est borné au bord du plateau (-1)');
 C.keys['ArrowLeft'] = false;
 
 console.log(echecs === 0 ? '\nTOUS LES TESTS PASSENT' : '\n' + echecs + ' ECHEC(S)');

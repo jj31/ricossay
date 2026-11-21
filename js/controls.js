@@ -69,8 +69,9 @@
       if (this.keys['ArrowUp'] || this.keys['z'] || this.keys['w']) dy += 1;
       if (this.keys['ArrowDown'] || this.keys['s']) dy -= 1;
       if (dx || dy) {
-        this.crankX = Math.min(1, Math.max(0, this.crankX + dx * this.keySpeed * dt));
-        this.crankY = Math.min(1, Math.max(0, this.crankY + dy * this.keySpeed * dt));
+        // Manivelles non bornées : seule la position du point est bornée (applyPoint).
+        this.crankX = Math.max(-100, Math.min(100, this.crankX + dx * this.keySpeed * dt));
+        this.crankY = Math.max(-100, Math.min(100, this.crankY + dy * this.keySpeed * dt));
         this.applyPoint();
       }
     },

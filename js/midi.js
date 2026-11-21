@@ -185,12 +185,20 @@
         }
 
         if (this.config.mode === 'relatif') {
+          // Encodeurs infinis : la manivelle virtuelle n'est PAS bornée à [0,1]
+          // (seul le point est borné par les bords de l'écran) -> amplitude illimitée.
           const prev = this.last[axis];
-          let delta = prev === null ? 0 : val - prev;
-          if (delta > 64) delta -= 128;
-          else if (delta < -64) delta += 128;
+          let delta = 0;
+          if (prev !== null) {
+            delta = val - prev;
+            delta = ((delta + 64) % 128 + 128) % 128 - 64; // ramené dans [-64, 63] (wrap absolu 127->0)
+            if (delta > 32) delta = 1;                     // convention 65/63 : un cran = 1 pas
+            else if (delta < -32) delta = -1;
+            if (val === 65) delta = 1;                     // la valeur elle-même indique le sens
+            else if (val === 63) delta = -1;
+          }
           this.last[axis] = val;
-          this.crank[axis] = Math.min(1, Math.max(0, this.crank[axis] + delta * 0.008 * this.config.sensibilite));
+          this.crank[axis] = Math.max(-100, Math.min(100, this.crank[axis] + delta * 0.02 * this.config.sensibilite));
           this.cb.crank(axis, this.crank[axis]);
         } else {
           this.last[axis] = val;

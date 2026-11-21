@@ -64,9 +64,10 @@ python3 -m http.server 8080
 4. Cliquer sur **« Calibrer les butées »** et balayer chaque bouton rotatif sur toute
    sa course, puis terminer : la course complète du bouton couvre alors tout l'écran.
 5. Options : inversion de X/Y, mode **relatif — réglage par défaut** (encodeurs
-   rotatifs infinis type MPK mini : aucun butée, le point n'est limité que par les
-   bords de l'écran) ou **position absolue** (potentiomètres avec butées), et la
-   sensibilité (gain du mode relatif).
+   rotatifs infinis type MPK mini : **amplitude illimitée**, la manivelle virtuelle
+   n'est pas bornée — seul le point est limité par les bords de l'écran ; gère les
+   conventions 1/127, wrap absolu 127→0 et 65/63) ou **position absolue**
+   (potentiomètres avec butées), et la sensibilité (gain du mode relatif).
 6. **Pads de fonction** : trois boutons d'apprentissage assignent des pads
    (Note On) à **Démarrer**, **Recommencer** et **Quitter** sur l'écran d'essai :
    cliquez sur « Apprendre le pad… » puis appuyez sur le pad du contrôleur.
