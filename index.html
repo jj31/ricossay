@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entraîneur Ricochay — APC mk2</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Entraîneur « Ricochay »</h1>
+  <p class="subtitle">Poursuite bimanuelle à deux manivelles — entraînement type épreuve psychomotrice (APC mk2 en USB / Web MIDI)</p>
+  <div class="toolbar">
+    <button id="btn-midi-connect" class="btn">Reconnecter MIDI</button>
+    <button id="btn-setup" class="btn">Apprendre / calibrer les boutons</button>
+    <button id="btn-history" class="btn">Historique</button>
+    <label class="chk"><input type="checkbox" id="chk-virtual"> Manivelles à l'écran</label>
+  </div>
+  <div id="midi-status" class="midi-status">MIDI : initialisation…</div>
+</header>
+
+<main>
+  <!-- Menu des exercices -->
+  <section id="screen-menu">
+    <p class="aide">
+      Principe de l'épreuve : un point cible (rouge) se déplace automatiquement le long de la trajectoire.
+      Avec les deux manivelles (boutons rotatifs de l'APC : X horizontal, Y vertical), gardez votre point (vert)
+      sur la cible le plus longtemps possible. Le score est le <strong>pourcentage du temps sur la cible</strong>,
+      converti en classe 1–9. Niveau 3 = essai de 2 minutes, comme l'épreuve standard.
+      Sans APC : flèches du clavier / WASD, ou souris directement sur le plateau.
+    </p>
+    <div id="exercise-grid" class="grid"></div>
+  </section>
+
+  <!-- Configuration MIDI -->
+  <section id="screen-setup" class="hidden">
+    <h2>Configuration des boutons rotatifs (APC mk2)</h2>
+    <div class="setup-cols">
+      <div class="panel">
+        <h3>Apprentissage des manivelles</h3>
+        <p>Cliquez sur un bouton puis <strong>tournez le bouton rotatif</strong> concerné sur l'APC :
+          le premier message CC reçu lui est assigné. « Auto » assigne X puis Y aux deux premiers boutons tournés.</p>
+        <div class="btn-row">
+          <button id="btn-learn-x" class="btn">Apprendre la manivelle X</button>
+          <button id="btn-learn-y" class="btn">Apprendre la manivelle Y</button>
+          <button id="btn-learn-auto" class="btn">Apprentissage auto (X puis Y)</button>
+        </div>
+        <div class="btn-row">
+          <button id="btn-calib" class="btn">Calibrer les butées (balayer X et Y)</button>
+          <button id="btn-midi-reset" class="btn danger">Réinitialiser</button>
+        </div>
+        <ul id="mapping-info" class="mapping-info"></ul>
+        <h3>Options</h3>
+        <div class="opt-row">
+          <label>Mode des boutons :
+            <select id="opt-mode">
+              <option value="position">Position absolue (potentiomètre)</option>
+              <option value="relatif">Relatif (encodeur à impulsions)</option>
+            </select>
+          </label>
+          <label class="chk"><input type="checkbox" id="opt-invx"> Inverser X</label>
+          <label class="chk"><input type="checkbox" id="opt-invy"> Inverser Y</label>
+          <label>Sensibilité (mode relatif) :
+            <input type="range" id="opt-sens" min="0.2" max="3" step="0.1" value="1">
+            <span id="opt-sens-val">1.00</span>
+          </label>
+        </div>
+        <h3>Seuils des classes (stanines)</h3>
+        <div id="seuils-editor" class="seuils-editor"></div>
+      </div>
+      <div class="panel">
+        <h3>Moniteur MIDI (derniers messages)</h3>
+        <ul id="midi-monitor" class="monitor"></ul>
+      </div>
+    </div>
+    <div class="btn-row"><button id="btn-back-menu" class="btn">Retour au menu</button></div>
+  </section>
+
+  <!-- Écran d'essai -->
+  <section id="screen-run" class="hidden">
+    <div class="hud">
+      <span id="hud-exercice" class="hud-title"></span>
+      <span>Temps restant : <strong id="hud-temps">—</strong></span>
+      <span>Sur la cible : <strong id="hud-pct">—</strong></span>
+      <span>Sorties : <strong id="hud-sorties">0</strong></span>
+      <span id="hud-vitesse"></span>
+      <span id="hud-tol"></span>
+    </div>
+    <div class="board-wrap">
+      <div id="virtual-cranks" class="virtual-cranks hidden">
+        <div class="vc-track"><div id="vc-x" class="vc-handle"></div><span>X</span></div>
+        <div class="vc-track"><div id="vc-y" class="vc-handle"></div><span>Y</span></div>
+      </div>
+      <canvas id="board" width="1040" height="680"></canvas>
+    </div>
+    <div class="btn-row">
+      <button id="btn-start" class="btn primary">Démarrer (Entrée)</button>
+      <button id="btn-pause" class="btn">Pause (Espace)</button>
+      <button id="btn-restart" class="btn">Recommencer</button>
+      <button id="btn-quit" class="btn danger">Quitter (Échap)</button>
+    </div>
+  </section>
+
+  <!-- Résultat -->
+  <section id="screen-result" class="hidden">
+    <h2>Résultat de l'essai</h2>
+    <div class="result-top">
+      <div id="res-score" class="score">—</div>
+      <div id="res-classe" class="classe-badge">—</div>
+    </div>
+    <div id="res-bar" class="bar"></div>
+    <ul id="res-detail" class="res-detail"></ul>
+    <div class="btn-row">
+      <button id="btn-replay" class="btn primary">Rejouer</button>
+      <button id="btn-result-menu" class="btn">Retour au menu</button>
+    </div>
+  </section>
+
+  <!-- Historique -->
+  <section id="screen-history" class="hidden">
+    <h2>Historique des essais</h2>
+    <div class="btn-row">
+      <button id="btn-csv" class="btn">Exporter en CSV</button>
+      <button id="btn-clear-history" class="btn danger">Effacer l'historique</button>
+      <button id="btn-back-menu2" class="btn">Retour au menu</button>
+    </div>
+    <table class="history">
+      <thead>
+        <tr><th>Date</th><th>Exercice</th><th>Niv.</th><th>Durée</th><th>Vitesse</th><th>Tol.</th><th>% cible</th><th>Sorties</th><th>Classe</th></tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+  </section>
+</main>
+
+<script src="js/logic.js"></script>
+<script src="js/midi.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
