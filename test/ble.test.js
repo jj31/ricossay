@@ -47,6 +47,11 @@ B.sens = 2;
 B.applyPacket(new Uint8Array([0, 1]));
 ok(Math.abs(B.crank.x - 0.06) < 1e-12, 'sensibilité 2 -> 1 pas = 0.06');
 B.sens = 1;
+B.crank.x = 0;
+B.sens = 0.05; // minimum du curseur
+B.applyPacket(new Uint8Array([0, 1]));
+ok(Math.abs(B.crank.x - 0.03 * 0.05) < 1e-12, 'sensibilité minimale 0.05 -> 1 pas = 0.0015 (réglage fin possible)');
+B.sens = 1;
 
 console.log('Persistance sensibilité');
 B.sens = 2.5;

@@ -99,7 +99,7 @@ protocole) — seule la carte change dans l'IDE.
   localhost ou HTTPS — Web Bluetooth exige un contexte sécurisé). Le nom annoncé
   est `RICOCHAY-ESP`. SW X = Démarrer/Recommencer, SW Y = Quitter.
 - Les manivelles BLE ne sont **pas bornées** (encodeurs infinis) ; sensibilité réglable
-  (« Sensibilité BLE » dans la configuration), persistée.
+  de **0,05 à 3** (« Sensibilité BLE » dans la configuration, pas de 0,01), persistée.
 - Le moniteur affiche les événements BLE reçus (`BLE X +3 -> manivelle 0.42`…).
 
 ## Sans contrôleur (MPK/ESP32)
