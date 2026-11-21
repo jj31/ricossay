@@ -79,7 +79,7 @@
         const b = document.createElement('button');
         b.className = 'btn level-n' + niv.id;
         const best = bestFor(ex.id, niv.id);
-        b.textContent = 'N' + niv.id + ' · ' + niv.duree + ' s · ' + niv.vitesse + ' px/s · tol ' + niv.tolerance + ' px' +
+        b.textContent = 'N' + niv.id + ' · ' + niv.duree + ' s · tol ' + niv.tolerance + ' px' +
           (best !== null ? '  ★ ' + best.toFixed(1) + ' %' : '');
         b.title = niv.nom;
         b.addEventListener('click', () => startRun(ex, niv));
@@ -143,11 +143,9 @@
     state.current = { exercice, niveau };
     state.sim = new L.RunSim({ exercice, niveau, echelle: ECHELLE });
     state.run = { phase: 'idle', countdownT: 0, lastTs: 0, raf: null, trail: [] };
-    Controls.setCrank('x', 0.5);
-    Controls.setCrank('y', 0.5);
+    Controls.anchor(state.sim.start[0], state.sim.start[1]);
     $('hud-exercice').textContent = exercice.nom + ' — ' + niveau.nom;
-    $('hud-vitesse').textContent = niveau.vitesse + ' px/s';
-    $('hud-tol').textContent = 'tolérance ' + niveau.tolerance + ' px';
+    $('hud-tol').textContent = 'tolérance ' + niveau.tolerance + ' px — départ au début du tracé';
     $('btn-pause').disabled = true;
     show('run');
     render();
@@ -157,6 +155,7 @@
     if (!state.run || state.run.phase !== 'idle') return;
     state.run.phase = 'countdown';
     state.run.countdownT = 3;
+    Controls.anchor(state.sim.start[0], state.sim.start[1]);
     state.run.lastTs = performance.now();
     state.run.raf = requestAnimationFrame(loop);
   }
@@ -216,12 +215,12 @@
       nomEx: exercice.nom,
       niveau: niveau.id,
       duree: niveau.duree,
-      vitesse: niveau.vitesse,
       tolerance: niveau.tolerance,
       pct: Math.round(st.pct * 10) / 10,
       sorties: st.sorties,
       ecartMoyenPx: Math.round(st.meanDistPx * 10) / 10,
       ecartMaxPx: Math.round(st.maxDistPx * 10) / 10,
+      couverturePct: Math.round(st.couverturePct * 10) / 10,
       classe,
     };
     state.history.unshift(entry);
@@ -236,10 +235,11 @@
     $('res-classe').textContent = 'Classe ' + e.classe;
     $('res-classe').className = 'classe-badge classe-' + e.classe;
     $('res-detail').innerHTML =
-      '<li>Exercice : <strong>' + e.nomEx + '</strong> — niveau ' + e.niveau + ' (' + e.duree + ' s, ' + e.vitesse + ' px/s, tolérance ' + e.tolerance + ' px)</li>' +
-      '<li>Temps sur la cible : <strong>' + (e.pct).toFixed(1) + ' %</strong> du temps</li>' +
+      '<li>Exercice : <strong>' + e.nomEx + '</strong> — niveau ' + e.niveau + ' (' + e.duree + ' s, tolérance ' + e.tolerance + ' px)</li>' +
+      '<li>Temps sur la trajectoire : <strong>' + e.pct.toFixed(1) + ' %</strong> du temps</li>' +
+      '<li>Progression : <strong>' + (e.couverturePct || 0).toFixed(0) + ' %</strong> du tracé parcouru</li>' +
       '<li>Sorties de piste : <strong>' + e.sorties + '</strong></li>' +
-      '<li>Écart moyen à la cible : <strong>' + e.ecartMoyenPx + ' px</strong> (max ' + e.ecartMaxPx + ' px)</li>' +
+      '<li>Écart moyen à la piste : <strong>' + e.ecartMoyenPx + ' px</strong> (max ' + e.ecartMaxPx + ' px)</li>' +
       '<li>Date : ' + new Date(e.ts).toLocaleString('fr-FR') + '</li>';
     const bar = $('res-bar');
     bar.innerHTML = '';
@@ -288,20 +288,21 @@
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      const cible = sim.cible();
-      const [tx, ty] = toPx(cible[0], cible[1]);
+      const [sx, sy] = toPx(sim.start[0], sim.start[1]);
       ctx.beginPath();
-      ctx.arc(tx, ty, niv.tolerance, 0, L.TAU);
-      ctx.strokeStyle = 'rgba(255, 82, 82, 0.35)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(tx, ty, 7, 0, L.TAU);
-      ctx.fillStyle = '#ff5252';
+      ctx.arc(sx, sy, 9, 0, L.TAU);
+      ctx.fillStyle = 'rgba(57, 211, 83, 0.25)';
       ctx.fill();
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = '#39d353';
       ctx.lineWidth = 2;
       ctx.stroke();
+
+      const proj = sim.distancePiste(Controls.point.x, Controls.point.y);
+      const pp = toPx(c.pts[proj.index][0], c.pts[proj.index][1]);
+      ctx.beginPath();
+      ctx.arc(pp[0], pp[1], 4, 0, L.TAU);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.fill();
 
       const r = state.run;
       if (r && r.trail.length > 1) {
@@ -368,6 +369,7 @@
     const st = sim.stats();
     $('hud-temps').textContent = Math.max(0, state.current.niveau.duree - st.temps).toFixed(1) + ' s';
     $('hud-pct').textContent = st.temps > 0 ? (100 * st.tempsSur / st.temps).toFixed(1) + ' %' : '—';
+    $('hud-couv').textContent = st.couverturePct.toFixed(0) + ' %';
     $('hud-sorties').textContent = String(st.sorties);
   }
 
@@ -403,8 +405,8 @@
       const tr = document.createElement('tr');
       const cells = [
         new Date(h.ts).toLocaleString('fr-FR'),
-        h.nomEx, 'N' + h.niveau, h.duree + ' s', h.vitesse + ' px/s', h.tolerance + ' px',
-        h.pct.toFixed(1) + ' %', h.sorties, 'C' + h.classe,
+        h.nomEx, 'N' + h.niveau, h.duree + ' s', h.tolerance + ' px',
+        h.pct.toFixed(1) + ' %', h.sorties, (h.couverturePct || 0).toFixed(0) + ' %', 'C' + h.classe,
       ];
       for (const c of cells) {
         const td = document.createElement('td');
@@ -416,12 +418,12 @@
   }
 
   function exportCSV() {
-    const header = ['date', 'exercice', 'niveau', 'duree_s', 'vitesse_px_s', 'tolerance_px', 'pct_temps_sur_cible', 'sorties', 'ecart_moyen_px', 'ecart_max_px', 'classe'];
+    const header = ['date', 'exercice', 'niveau', 'duree_s', 'tolerance_px', 'pct_temps_sur_piste', 'sorties', 'ecart_moyen_px', 'ecart_max_px', 'couverture_pct', 'classe'];
     const lines = [header.join(';')];
     for (const h of state.history) {
       lines.push([
-        h.ts, '"' + h.nomEx + '"', h.niveau, h.duree, h.vitesse, h.tolerance,
-        h.pct, h.sorties, h.ecartMoyenPx, h.ecartMaxPx, h.classe,
+        h.ts, '"' + h.nomEx + '"', h.niveau, h.duree, h.tolerance,
+        h.pct, h.sorties, h.ecartMoyenPx, h.ecartMaxPx, h.couverturePct || 0, h.classe,
       ].join(';'));
     }
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });

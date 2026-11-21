@@ -1,5 +1,5 @@
 'use strict';
-// Tests unitaires du module logique (trajectoires, niveaux, scoring).
+// Tests unitaires du module logique (trajectoires, mode traçage, scoring).
 // Lancement : node test/logic.test.js
 const path = require('path');
 const L = require(path.join(__dirname, '..', 'js', 'logic.js'));
@@ -14,6 +14,8 @@ console.log('Exercices et niveaux');
 ok(L.EXERCICES.length === 9, '9 exercices définis');
 ok(L.NIVEAUX.length === 3, '3 niveaux de difficulté');
 ok(L.NIVEAUX[2].duree === 120, 'niveau 3 = essai standard de 2 minutes (120 s)');
+ok(L.NIVEAUX[0].tolerance > L.NIVEAUX[1].tolerance && L.NIVEAUX[1].tolerance > L.NIVEAUX[2].tolerance,
+  'tolérance décroissante avec le niveau (' + L.NIVEAUX.map((n) => n.tolerance).join('/') + ' px)');
 for (const ex of L.EXERCICES) {
   const c = L.echantillonner(ex.courbe, ex.fermee, 800);
   let dansBornes = true;
@@ -23,33 +25,35 @@ for (const ex of L.EXERCICES) {
   ok(dansBornes && c.total > 0.5, ex.id + ' : points dans [-1,1] et longueur > 0 (' + c.total.toFixed(2) + ')');
 }
 
-console.log('Position le long des courbes (longueur d\'arc)');
+console.log('Point de départ et parcours de courbe');
 {
   const ex = L.EXERCICES.find((e) => e.id === 'cercle');
   const c = L.echantillonner(ex.courbe, true, 2000);
-  const p0 = L.pointSurCourbe(c, 0);
+  const sim = new L.RunSim({ exercice: ex, niveau: L.NIVEAUX[0], echelle: 270 });
+  ok(Math.abs(sim.start[0] - 0.75) < 1e-6 && Math.abs(sim.start[1]) < 1e-6,
+    'le mobile démarre au début de la trajectoire (cercle : (0.75, 0))');
   const pQ = L.pointSurCourbe(c, c.total / 4);
-  ok(Math.abs(p0[0] - 0.75) < 1e-6 && Math.abs(p0[1]) < 1e-6, 'cercle : départ en (0.75, 0)');
-  ok(Math.abs(pQ[0]) < 1e-6 && Math.abs(pQ[1] - 0.75) < 1e-6, 'cercle : quart de tour en (0, 0.75)');
+  ok(Math.abs(pQ[0]) < 1e-6 && Math.abs(pQ[1] - 0.75) < 1e-6, 'quart de tour en (0, 0.75)');
   const pLoop = L.pointSurCourbe(c, c.total * 1.5);
   const pHalf = L.pointSurCourbe(c, c.total / 2);
-  ok(Math.hypot(pLoop[0] - pHalf[0], pLoop[1] - pHalf[1]) < 1e-9, 'courbe fermée : rebouclage après un tour complet');
+  ok(Math.hypot(pLoop[0] - pHalf[0], pLoop[1] - pHalf[1]) < 1e-9, 'courbe fermée : rebouclage après un tour');
+  const exL = L.EXERCICES.find((e) => e.id === 'ligne-h');
+  const cL = L.echantillonner(exL.courbe, false, 100);
+  ok(Math.abs(L.pointSurCourbe(cL, cL.total)[0] - 0.85) < 1e-9, 'ligne : extrémité au bout droit');
+  const pR = L.pointSurCourbe(cL, cL.total * 1.5);
+  ok(Math.abs(pR[0]) < 0.05, 'courbe ouverte : aller-retour (mi-retour au centre)');
 }
+
+console.log('distancePiste');
 {
-  const ex = L.EXERCICES.find((e) => e.id === 'ligne-h');
-  const c = L.echantillonner(ex.courbe, false, 100);
-  const pFin = L.pointSurCourbe(c, c.total);
-  const pRetour = L.pointSurCourbe(c, c.total * 1.5);
-  ok(Math.abs(pFin[0] - 0.85) < 1e-9, 'ligne : fin au bout droit');
-  ok(Math.abs(pRetour[0] - 0) < 0.05 && Math.abs(pRetour[1]) < 1e-9, 'courbe ouverte : aller-retour (mi-retour au centre)');
+  const ex = L.EXERCICES.find((e) => e.id === 'cercle');
+  const sim = new L.RunSim({ exercice: ex, niveau: L.NIVEAUX[0], echelle: 270 });
+  ok(sim.distancePiste(0.75, 0).distPx < 1e-6, 'point sur la courbe -> distance 0');
+  const d = sim.distancePiste(0, 0).distPx;
+  ok(Math.abs(d - 0.75 * 270) < 1, 'centre du cercle -> distance = rayon (' + d.toFixed(1) + ' px)');
 }
 
-console.log('Avancer (ping-pong)');
-ok(Math.abs(L.avancer(0, 5, 10, true) - 5) < 1e-12, 'fermée : avance simple');
-ok(Math.abs(L.avancer(8, 5, 10, true) - 3) < 1e-12, 'fermée : modulo longueur');
-ok(Math.abs(L.avancer(8, 5, 10, false) - 7) < 1e-12, 'ouverte : retour après le bout (15 -> 7)');
-
-console.log('RunSim : poursuite parfaite');
+console.log('RunSim : tracé parfait');
 {
   const ex = L.EXERCICES.find((e) => e.id === 'cercle');
   const niv = L.NIVEAUX[1];
@@ -57,18 +61,20 @@ console.log('RunSim : poursuite parfaite');
   const dt = 1 / 120;
   let t = 0;
   while (!sim.termine && t < niv.duree + 1) {
-    const c = sim.cible();
-    sim.update(dt, { x: c[0], y: c[1] });
+    const s = sim.L * Math.min(1, t / niv.duree); // un tour complet sur la durée
+    const p = L.pointSurCourbe(sim.courbe, s);
+    sim.update(dt, { x: p[0], y: p[1] });
     t += dt;
   }
   const st = sim.stats();
   ok(sim.termine, 'essai terminé après la durée prévue');
-  ok(Math.abs(st.pct - 100) < 1e-9, 'poursuite parfaite => 100 % (' + st.pct + ')');
+  ok(Math.abs(st.pct - 100) < 1e-9, 'tracé parfait => 100 % du temps sur la piste (' + st.pct + ')');
   ok(st.sorties === 0, 'aucune sortie');
+  ok(st.couverturePct > 95, 'progression ~100 % du tracé parcouru (' + st.couverturePct.toFixed(1) + ' %)');
   ok(Math.abs(st.temps - niv.duree) < 1e-6, 'durée mesurée = durée configurée');
 }
 
-console.log('RunSim : point immobile loin de la cible');
+console.log('RunSim : point immobile hors de la piste');
 {
   const ex = L.EXERCICES.find((e) => e.id === 'cercle');
   const niv = L.NIVEAUX[1];
@@ -77,29 +83,28 @@ console.log('RunSim : point immobile loin de la cible');
   let t = 0;
   while (!sim.termine && t < niv.duree + 1) { sim.update(dt, { x: 0, y: 0 }); t += dt; }
   const st = sim.stats();
-  ok(st.pct === 0, 'point au centre d\'un cercle de rayon 0.75*270 px => 0 % (tolérance ' + niv.tolerance + ' px)');
-  ok(st.sorties >= 1, 'au moins une sortie comptabilisée (' + st.sorties + ')');
-  ok(st.maxDistPx > niv.tolerance, 'écart max > tolérance');
+  ok(st.pct === 0, 'jamais sur la piste => 0 % (tolérance ' + niv.tolerance + ' px, écart ' + st.maxDistPx.toFixed(0) + ' px)');
+  ok(st.sorties === 1, 'départ hors piste = 1 sortie comptabilisée');
+  ok(Math.abs(st.maxDistPx - 0.75 * 270) < 1, 'écart max = rayon du cercle');
 }
 
-console.log('RunSim : sorties comptabilisées aux transitions');
+console.log('RunSim : sorties comptabilisées aux transitions hors piste');
 {
   const ex = L.EXERCICES.find((e) => e.id === 'ligne-h');
   const niv = L.NIVEAUX[0];
   const sim = new L.RunSim({ exercice: ex, niveau: niv, echelle: 270 });
   const dt = 1 / 60;
-  // alterne sur/hors cible toutes les 0.5 s en restant sur la ligne
   let t = 0, phase = 0;
   while (!sim.termine && t < niv.duree + 1) {
-    const c = sim.cible();
-    const decalage = (phase % 2 === 0) ? 0 : 0.5; // hors tolérance (26 px = 0.096 unité)
-    sim.update(dt, { x: c[0] + decalage, y: c[1] });
+    const x = -0.85 + 1.7 * (t / niv.duree);
+    const y = (phase % 2 === 0) ? 0 : 0.3; // 0.3*270 = 81 px > tolérance 26 px
+    sim.update(dt, { x, y });
     t += dt;
     if (Math.floor(t / 0.5) !== Math.floor((t - dt) / 0.5)) phase++;
   }
   const st = sim.stats();
-  ok(st.sorties >= 10, 'sorties comptées à chaque sortie de zone (' + st.sorties + ')');
-  ok(st.pct > 30 && st.pct < 70, 'environ 50 % sur la cible (' + st.pct.toFixed(1) + ' %)');
+  ok(st.sorties >= 10, 'sortie détectée à chaque passage hors piste (' + st.sorties + ')');
+  ok(st.pct > 30 && st.pct < 70, 'environ 50 % du temps sur la piste (' + st.pct.toFixed(1) + ' %)');
 }
 
 console.log('Classes (stanines)');

@@ -8,8 +8,8 @@ test de ricossay
 
 Application web d'entraînement à l'épreuve dite **de Ricochay** : deux manivelles
 orthogonales (X horizontal, Y vertical) déplacent un point à l'écran, et le sujet
-doit maintenir ce point sur une **cible qui se déplace automatiquement le long d'une
-trajectoire**, le plus longtemps possible.
+doit **parcourir le tracé sans en sortir** : le point **démarre au début de la
+trajectoire** et chaque sortie de piste est détectée et comptabilisée.
 
 Les deux manivelles sont les **boutons rotatifs (encodeurs) d'un Akai APC mk2**,
 connecté en USB et lu via l'**API Web MIDI** du navigateur. L'application prévoit
@@ -20,20 +20,22 @@ Aucune dépendance, aucun build : page statique en HTML/CSS/JS vanilla.
 
 ## Standards de l'épreuve (recherche effectuée)
 
-- **Principe** : poursuite bimanuelle (*pursuit tracking*) — la cible avance à vitesse
-  constante sur un circuit ; on mesure le **temps de contact** du point sur la cible.
+- **Principe retenu ici** : le mobile part du début du circuit et doit le parcourir
+  lui-même sans sortir de la piste ; on mesure le **temps passé sur la piste** et le
+  **nombre de sorties** (détection de sortie de trajectoire). La variante classique de
+  l'appareil à point moteur que l'on poursuit n'est pas retenue ici.
 - **Durée usuelle d'un essai : 2 minutes** (standard des épreuves prolongées de
   coordination psychomotrice en sélection).
-- **Score** : pourcentage du temps passé sur la cible, converti en **classe (stanine)
+- **Score** : pourcentage du temps passé sur la piste, converti en **classe (stanine)
   de 1 à 9**. Seuils usuels constatés dans la communauté des candidats pilotes
   (ex. retours sur le test psychomoteur type Pilotest/EPL) : **classe 8 à partir de
   78 %, classe 9 à partir de 82 %**. Les seuils sont modifiables dans l'interface.
-- **Niveaux de difficulté** : vitesse de déplacement de la cible, largeur de la piste
-  (tolérance) et complexité de la trajectoire.
+- **Niveaux de difficulté** : largeur de la piste (tolérance), durée de l'essai et
+  complexité de la trajectoire.
 
 > Les barèmes officiels des sélections ne sont pas publiés ; les valeurs ci-dessus sont
 > les standards usuels rapportés publiquement. Tout est paramétrable dans l'app
-> (vitesse, tolérance, durée, seuils de classe).
+> (tolérance, durée, seuils de classe).
 
 ## Lancement
 
@@ -84,16 +86,17 @@ sont parcourues en aller-retour ; les fermées en boucle.
 
 Chaque exercice propose **3 niveaux** :
 
-| Niveau | Vitesse cible | Tolérance | Durée |
-|--------|---------------|-----------|-------|
-| N1 Découverte | 80 px/s | 26 px | 60 s |
-| N2 Confirmé | 140 px/s | 18 px | 90 s |
-| N3 Expert | 210 px/s | 12 px | **120 s (2 min, standard)** |
+| Niveau | Tolérance (demi-largeur de piste) | Durée |
+|--------|-------------------------------------|-------|
+| N1 Découverte | 26 px | 60 s |
+| N2 Confirmé | 18 px | 90 s |
+| N3 Expert | 12 px | **120 s (2 min, standard)** |
 
 ## Scoring et historique
 
-- Score = **% du temps avec le point dans la zone de tolérance autour de la cible**.
-- Statistiques : sorties de piste (transitions hors zone), écart moyen/max à la cible.
+- Score = **% du temps avec le point dans la zone de tolérance autour du tracé** (la piste).
+- Statistiques : sorties de piste (transitions hors zone), écart moyen/max à la piste,
+  progression = % du tracé parcouru.
 - **Classe 1–9** via les seuils modifiables (défaut : 82/78/74/70/65/60/52/42 %).
 - Historique local (`localStorage`, 500 essais), meilleur score affiché (★) par
   exercice/niveau, **export CSV**.
@@ -113,7 +116,7 @@ test/*.test.js      tests Node (aucun framework requis)
 ## Tests
 
 ```bash
-node test/logic.test.js     # trajectoires, avance de la cible, scoring, classes
+node test/logic.test.js     # trajectoires, point de départ, distance à la piste, scoring, classes
 node test/midi.test.js      # apprentissage CC, calibration, modes position/relatif
 node test/controls.test.js  # manivelles -> point, clavier, souris
 ```

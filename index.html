@@ -24,9 +24,10 @@
   <!-- Menu des exercices -->
   <section id="screen-menu">
     <p class="aide">
-      Principe de l'épreuve : un point cible (rouge) se déplace automatiquement le long de la trajectoire.
-      Avec les deux manivelles (boutons rotatifs de l'APC : X horizontal, Y vertical), gardez votre point (vert)
-      sur la cible le plus longtemps possible. Le score est le <strong>pourcentage du temps sur la cible</strong>,
+      Principe de l'épreuve : votre point (vert) <strong>démarre au début de la trajectoire</strong> (marqueur vert).
+      Parcourez le tracé avec les deux manivelles (boutons rotatifs de l'APC : X horizontal, Y vertical)
+      <strong>sans sortir de la piste</strong> (bande bleue = tolérance). Chaque sortie de piste est détectée
+      et comptabilisée. Le score est le <strong>pourcentage du temps passé sur la trajectoire</strong>,
       converti en classe 1–9. Niveau 3 = essai de 2 minutes, comme l'épreuve standard.
       Sans APC : flèches du clavier / WASD, ou souris directement sur le plateau.
     </p>
@@ -82,9 +83,9 @@
     <div class="hud">
       <span id="hud-exercice" class="hud-title"></span>
       <span>Temps restant : <strong id="hud-temps">—</strong></span>
-      <span>Sur la cible : <strong id="hud-pct">—</strong></span>
+      <span>Sur la piste : <strong id="hud-pct">—</strong></span>
+      <span>Progression : <strong id="hud-couv">—</strong></span>
       <span>Sorties : <strong id="hud-sorties">0</strong></span>
-      <span id="hud-vitesse"></span>
       <span id="hud-tol"></span>
     </div>
     <div class="board-wrap">
@@ -127,7 +128,7 @@
     </div>
     <table class="history">
       <thead>
-        <tr><th>Date</th><th>Exercice</th><th>Niv.</th><th>Durée</th><th>Vitesse</th><th>Tol.</th><th>% cible</th><th>Sorties</th><th>Classe</th></tr>
+        <tr><th>Date</th><th>Exercice</th><th>Niv.</th><th>Durée</th><th>Tol.</th><th>% piste</th><th>Sorties</th><th>Progression</th><th>Classe</th></tr>
       </thead>
       <tbody id="history-body"></tbody>
     </table>

@@ -3,10 +3,15 @@
 
   // État des deux "manivelles" virtuelles (0..1) et du point utilisateur
   // (coordonnées normalisées [-1, 1], y vers le haut).
+  // Le point est ancré à une origine (départ du tracé) : les manivelles déplacent
+  // le point relativement à cette origine, quelle que soit la position absolue
+  // des boutons rotatifs.
   // Sources possibles : MIDI (MidiRig), clavier, souris, manivelles à l'écran.
   const Controls = {
     crankX: 0.5,
     crankY: 0.5,
+    origin: { x: 0, y: 0 },          // position du point quand les manivelles sont à leur origine
+    crankOrigin: { x: 0.5, y: 0.5 },  // valeurs des manivelles à l'ancrage
     point: { x: 0, y: 0 },
     keySpeed: 0.6, // fraction de la plage par seconde avec les flèches
     keys: {},
@@ -29,22 +34,32 @@
       window.addEventListener('keyup', (e) => { this.keys[e.key] = false; });
     },
 
+    // Ancre le point courant à la position (x, y) du tracé.
+    anchor(x, y) {
+      this.origin.x = x;
+      this.origin.y = y;
+      this.crankOrigin.x = this.crankX;
+      this.crankOrigin.y = this.crankY;
+      this.applyPoint();
+    },
+
     setCrank(axis, v) {
       if (axis === 'x') this.crankX = v; else this.crankY = v;
       this.applyPoint();
     },
 
-    // La souris (ou les manivelles à l'écran) positionne directement le point.
+    // La souris (ou les manivelles à l'écran) positionne directement le point ;
+    // l'origine des manivelles est réajustée pour rester cohérente.
     setPointDirect(x, y) {
       this.point.x = Math.min(1, Math.max(-1, x));
       this.point.y = Math.min(1, Math.max(-1, y));
-      this.crankX = (this.point.x + 1) / 2;
-      this.crankY = (this.point.y + 1) / 2;
+      this.crankOrigin.x = this.crankX - (this.point.x - this.origin.x) / 2;
+      this.crankOrigin.y = this.crankY - (this.point.y - this.origin.y) / 2;
     },
 
     applyPoint() {
-      this.point.x = this.crankX * 2 - 1;
-      this.point.y = this.crankY * 2 - 1;
+      this.point.x = Math.min(1, Math.max(-1, this.origin.x + (this.crankX - this.crankOrigin.x) * 2));
+      this.point.y = Math.min(1, Math.max(-1, this.origin.y + (this.crankY - this.crankOrigin.y) * 2));
     },
 
     update(dt) {

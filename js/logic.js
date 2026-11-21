@@ -11,15 +11,15 @@
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
   // Niveaux de difficulté communs à tous les exercices.
-  // vitesse en px/s, tolerance (rayon de la zone "sur la cible") en px, duree en secondes.
-  // Niveau 3 = essai standard de 2 minutes.
+  // duree de l'essai en secondes (niveau 3 = essai standard de 2 minutes),
+  // tolerance = demi-largeur de la piste en px : sortir de la piste = "sortie".
   const NIVEAUX = [
-    { id: 1, nom: 'Niveau 1 · Découverte', vitesse: 80,  tolerance: 26, duree: 60 },
-    { id: 2, nom: 'Niveau 2 · Confirmé',   vitesse: 140, tolerance: 18, duree: 90 },
-    { id: 3, nom: 'Niveau 3 · Expert',     vitesse: 210, tolerance: 12, duree: 120 },
+    { id: 1, nom: 'Niveau 1 · Découverte', tolerance: 26, duree: 60 },
+    { id: 2, nom: 'Niveau 2 · Confirmé',   tolerance: 18, duree: 90 },
+    { id: 3, nom: 'Niveau 3 · Expert',     tolerance: 12, duree: 120 },
   ];
 
-  // Seuils de conversion du pourcentage de temps sur la cible en classe (stanine 1-9).
+  // Seuils de conversion du pourcentage de temps sur la piste en classe (stanine 1-9).
   // Valeurs usuelles constatées pour les épreuves de poursuite psychomotrices
   // (classe 8 >= 78 %, classe 9 >= 82 %). Modifiables dans l'interface.
   const SEUILS_CLASSE = [
@@ -102,18 +102,10 @@
     return [lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)];
   }
 
-  function avancer(s, ds, L, fermee) {
-    s += ds;
-    if (fermee) return ((s % L) + L) % L;
-    const periode = 2 * L;
-    let m = s % periode;
-    if (m < 0) m += periode;
-    return m <= L ? m : periode - m;
-  }
-
-  // Simulation d'un essai : fait avancer la cible à vitesse constante le long de
-  // la trajectoire et mesure le temps passé avec le point utilisateur dans la
-  // zone de tolérance autour de la cible.
+  // Simulation d'un essai en mode "traçage" : le point utilisateur part du début
+  // de la trajectoire et doit la parcourir sans sortir de la piste (bande de
+  // tolérance autour de la courbe). On mesure le temps passé SUR la piste,
+  // le nombre de sorties (transitions hors piste) et la progression parcourue.
   class RunSim {
     constructor(opts) {
       this.exercice = opts.exercice;
@@ -122,37 +114,48 @@
       this.courbe = echantillonner(this.exercice.courbe, this.exercice.fermee, 1600);
       this.courbe.fermee = this.exercice.fermee;
       this.L = this.courbe.total;
-      this.vitesseN = this.niveau.vitesse / this.echelle;
       this.tolN = this.niveau.tolerance / this.echelle;
       this.duree = this.niveau.duree;
+      this.start = pointSurCourbe(this.courbe, 0);
       this.reset();
     }
     reset() {
-      this.s = 0;
       this.temps = 0;
       this.tempsSur = 0;
       this.sorties = 0;
-      // Démarre "sur la cible" : un essai qui commence hors zone compte une sortie.
+      // Démarre "sur la piste" : un essai qui commence hors piste compte une sortie.
       this.dans = true;
       this.termine = false;
       this.sommeDist = 0;
       this.n = 0;
       this.maxDist = 0;
+      this.couvert = new Uint8Array(this.courbe.pts.length);
+      this.couvertN = 0;
     }
-    cible() { return pointSurCourbe(this.courbe, this.s); }
+    // Distance minimale (en px) entre le point et la trajectoire, avec l'indice
+    // du point de la courbe le plus proche (utilisé pour la progression).
+    distancePiste(x, y) {
+      const pts = this.courbe.pts;
+      let best = Infinity, bi = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const dx = x - pts[i][0], dy = y - pts[i][1];
+        const d2 = dx * dx + dy * dy;
+        if (d2 < best) { best = d2; bi = i; }
+      }
+      return { distPx: Math.sqrt(best) * this.echelle, index: bi };
+    }
     update(dt, user) {
       if (this.termine) return;
-      this.s = avancer(this.s, this.vitesseN * dt, this.L, this.exercice.fermee);
       this.temps += dt;
-      const c = this.cible();
-      const dPx = Math.hypot(user.x - c[0], user.y - c[1]) * this.echelle;
-      const sur = dPx <= this.niveau.tolerance;
+      const d = this.distancePiste(user.x, user.y);
+      if (!this.couvert[d.index]) { this.couvert[d.index] = 1; this.couvertN++; }
+      const sur = d.distPx <= this.niveau.tolerance;
       if (sur) this.tempsSur += dt;
       else if (this.dans) this.sorties++;
       this.dans = sur;
-      this.sommeDist += dPx;
+      this.sommeDist += d.distPx;
       this.n++;
-      if (dPx > this.maxDist) this.maxDist = dPx;
+      if (d.distPx > this.maxDist) this.maxDist = d.distPx;
       if (this.temps >= this.duree) {
         this.temps = this.duree;
         this.termine = true;
@@ -160,6 +163,7 @@
     }
     stats() {
       const pct = this.temps > 0 ? (100 * this.tempsSur) / this.temps : 0;
+      const couverturePct = (100 * this.couvertN) / this.courbe.pts.length;
       return {
         temps: this.temps,
         duree: this.duree,
@@ -168,6 +172,7 @@
         sorties: this.sorties,
         meanDistPx: this.n ? this.sommeDist / this.n : 0,
         maxDistPx: this.maxDist,
+        couverturePct,
         termine: this.termine,
         dans: this.dans,
       };
@@ -185,7 +190,7 @@
   return {
     TAU, lerp, clamp,
     NIVEAUX, SEUILS_CLASSE, EXERCICES,
-    echantillonner, pointSurCourbe, avancer,
+    echantillonner, pointSurCourbe,
     RunSim, classePour,
   };
 });
