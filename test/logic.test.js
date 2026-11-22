@@ -11,7 +11,7 @@ function ok(cond, msg) {
 }
 
 console.log('Exercices et niveaux');
-ok(L.EXERCICES.length === 10, '10 exercices définis (dont la boucle ouverte d\'après image)');
+ok(L.EXERCICES.length === 12, '12 exercices définis (dont boucle image, chicane, circuit routier)');
 ok(L.NIVEAUX.length === 3, '3 niveaux de difficulté');
 ok(L.NIVEAUX[2].duree === 120, 'niveau 3 = essai standard de 2 minutes (120 s)');
 ok(L.NIVEAUX[0].tolerance > L.NIVEAUX[1].tolerance && L.NIVEAUX[1].tolerance > L.NIVEAUX[2].tolerance,
@@ -23,6 +23,37 @@ for (const ex of L.EXERCICES) {
     if (Math.abs(p[0]) > 1.001 || Math.abs(p[1]) > 1.001) dansBornes = false;
   }
   ok(dansBornes && c.total > 0.5, ex.id + ' : points dans [-1,1] et longueur > 0 (' + c.total.toFixed(2) + ')');
+}
+
+console.log('Continuité des parcours (pas de saut entre segments ligne/arc)');
+{
+  let maxSaut = 0, idMax = '';
+  for (const ex of L.EXERCICES) {
+    const c = L.echantillonner(ex.courbe, ex.fermee, 2000);
+    for (let i = 1; i < c.pts.length; i++) {
+      const d = Math.hypot(c.pts[i][0] - c.pts[i - 1][0], c.pts[i][1] - c.pts[i - 1][1]);
+      if (d > maxSaut) { maxSaut = d; idMax = ex.id; }
+    }
+  }
+  ok(maxSaut < 0.05, 'saut max entre échantillons consecutifs < 0.05 pour tous les exercices (max=' + maxSaut.toFixed(4) + ' sur ' + idMax + ')');
+}
+{
+  const chicane = L.EXERCICES.find((e) => e.id === 'chicane');
+  const circuit = L.EXERCICES.find((e) => e.id === 'circuit');
+  const cC = L.echantillonner(chicane.courbe, false, 2000);
+  let maxY = 0, minY = 0;
+  for (const p of cC.pts) { maxY = Math.max(maxY, p[1]); minY = Math.min(minY, p[1]); }
+  ok(Math.abs(maxY - 0.3) < 0.02 && Math.abs(minY + 0.3) < 0.02, 'chicane : demi-cercles de rayon 0.3 (y max=' + maxY.toFixed(2) + ', min=' + minY.toFixed(2) + ')');
+  const cR = L.echantillonner(circuit.courbe, false, 2000);
+  let aQuart = false;
+  for (const p of cR.pts) {
+    const d = Math.hypot(p[0] - 0.3, p[1] + 0.4); // distance au centre du 1er quart de cercle
+    if (Math.abs(d - 0.3) < 0.02) { aQuart = true; break; }
+  }
+  ok(aQuart, 'circuit : contient bien un quart de cercle de rayon 0.3 autour de (0.3, -0.4)');
+  const p0 = L.pointSurCourbe(cR, 0), p1 = L.pointSurCourbe(cR, cR.total);
+  ok(Math.abs(p0[0] + 0.8) < 0.01 && Math.abs(p0[1] + 0.7) < 0.01, 'circuit : départ en (-0.8, -0.7)');
+  ok(Math.abs(p1[0] - 0.7) < 0.01 && Math.abs(p1[1] - 0.2) < 0.01, 'circuit : arrivée en (0.7, 0.2)');
 }
 
 console.log('Point de départ et parcours de courbe');

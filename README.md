@@ -114,7 +114,9 @@ protocole) — seule la carte change dans l'IDE.
 
 9 trajectoires : ligne horizontale, ligne verticale, diagonale, cercle, ellipse,
 sinusoïde, carré (angles), huit (lemniscate), Lissajous 3:2, **boucle ouverte en goutte**
-(d'après image de référence, spline de Catmull-Rom). Les courbes ouvertes
+(d'après image de référence, spline de Catmull-Rom), **chicane** (droites + demi-cercles
+alternés haut/bas) et **circuit routier** (droites, quarts de cercle en virages, diagonales,
+demi-cercle — type parcours d'examen de conduite). Les courbes ouvertes
 sont parcourues en aller-retour ; les fermées en boucle.
 
 Chaque exercice propose **3 niveaux** :

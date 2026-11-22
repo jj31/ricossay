@@ -52,6 +52,38 @@
     };
   }
 
+  // Construit une courbe à partir d'un point de départ et d'une liste de segments :
+  //   { ligne: [x, y] }                    -> segment droit (ligne ou diagonale)
+  //   { arc: { c: [cx, cy], r, a0, a1 } }   -> arc de cercle, angles en radians (sens trigo)
+  // Le point de départ de chaque arc doit être le point courant (c + r*(cos a0, sin a0)).
+  function parcoursParSegments(depart, segments) {
+    const pts = [depart.slice()];
+    let cur = depart.slice();
+    for (const s of segments) {
+      if (s.ligne) {
+        const vers = s.ligne;
+        const n = Math.max(2, Math.round(Math.hypot(vers[0] - cur[0], vers[1] - cur[1]) / 0.01));
+        for (let i = 1; i <= n; i++) {
+          pts.push([cur[0] + (vers[0] - cur[0]) * i / n, cur[1] + (vers[1] - cur[1]) * i / n]);
+        }
+        cur = vers.slice();
+      } else if (s.arc) {
+        const c = s.arc.c, r = s.arc.r, a0 = s.arc.a0, a1 = s.arc.a1;
+        const sweep = a1 - a0;
+        const n = Math.max(4, Math.round(Math.abs(sweep) * r / 0.01));
+        for (let i = 1; i <= n; i++) {
+          const a = a0 + sweep * i / n;
+          pts.push([c[0] + r * Math.cos(a), c[1] + r * Math.sin(a)]);
+        }
+        cur = [c[0] + r * Math.cos(a1), c[1] + r * Math.sin(a1)];
+      }
+    }
+    return function (t) {
+      const i = Math.min(pts.length - 1, Math.floor(t * pts.length));
+      return pts[i];
+    };
+  }
+
   // Coordonnées normalisées : x et y dans [-1, 1], y vers le haut.
   const EXERCICES = [
     { id: 'ligne-h', nom: 'Ligne horizontale', desc: 'Suivi d\'une ligne droite horizontale.', fermee: false,
@@ -79,6 +111,23 @@
       courbe: catmullRom([
         [0.6, -0.6], [0.4, -0.2], [0.2, 0.2], [0.0, 0.6], [-0.2, 0.8], [-0.4, 0.6],
         [-0.6, 0.2], [-0.4, -0.2], [-0.2, -0.4], [0.0, -0.6], [0.2, -0.8], [0.4, -0.6],
+      ]) },
+    { id: 'chicane', nom: 'Chicane (demi-cercles alternés)', desc: 'Slalom : droites horizontales et demi-cercles alternés haut/bas.', fermee: false,
+      courbe: parcoursParSegments([-0.85, 0], [
+        { arc: { c: [-0.55, 0], r: 0.3, a0: Math.PI, a1: 0 } },            // demi-cercle haut
+        { ligne: [0.05, 0] },
+        { arc: { c: [0.35, 0], r: 0.3, a0: Math.PI, a1: 2 * Math.PI } },    // demi-cercle bas
+        { ligne: [0.85, 0] },
+      ]) },
+    { id: 'circuit', nom: 'Circuit routier', desc: 'Droites, quarts de cercle (virages), diagonales et un demi-cercle — type parcours de conduite.', fermee: false,
+      courbe: parcoursParSegments([-0.8, -0.7], [
+        { ligne: [0.3, -0.7] },                                            // droite horizontale
+        { arc: { c: [0.3, -0.4], r: 0.3, a0: -Math.PI / 2, a1: 0 } },      // quart de cercle (virage)
+        { ligne: [0.6, 0.3] },                                             // droite verticale
+        { arc: { c: [0.3, 0.3], r: 0.3, a0: 0, a1: Math.PI / 2 } },        // quart de cercle (virage)
+        { ligne: [-0.5, -0.1] },                                           // diagonale
+        { arc: { c: [-0.5, 0.3], r: 0.4, a0: -Math.PI / 2, a1: -3 * Math.PI / 2 } }, // demi-cercle vers la gauche
+        { ligne: [0.7, 0.2] },                                             // diagonale de sortie
       ]) },
   ];
 
