@@ -316,10 +316,8 @@
     const canvas = $('board');
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, H);
 
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = '#2a3550';
     ctx.lineWidth = 2;
     ctx.strokeRect(MARGIN, MARGIN, W - 2 * MARGIN, H - 2 * MARGIN);
 
@@ -333,43 +331,44 @@
         if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
       }
       if (sim.exercice.fermee) ctx.closePath();
-      ctx.strokeStyle = '#e8e8e8';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
       ctx.lineWidth = niv.tolerance * 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
-      ctx.strokeStyle = '#000000';
+      ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
       const [sx, sy] = toPx(sim.start[0], sim.start[1]);
       ctx.beginPath();
       ctx.arc(sx, sy, 9, 0, L.TAU);
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = 'rgba(57, 211, 83, 0.25)';
       ctx.fill();
-      ctx.beginPath();
-      ctx.arc(sx, sy, 3.5, 0, L.TAU);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
+      ctx.strokeStyle = '#39d353';
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
       const proj = sim.distancePiste(Controls.point.x, Controls.point.y);
       const pp = toPx(c.pts[proj.index][0], c.pts[proj.index][1]);
       ctx.beginPath();
       ctx.arc(pp[0], pp[1], 4, 0, L.TAU);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#000000';
       ctx.fill();
-      ctx.strokeStyle = '#000000';
+      ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
       if (!sim.exercice.fermee) {
         const fin = L.pointSurCourbe(c, c.total);
         const [fx, fy] = toPx(fin[0], fin[1]);
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(fx - 8, fy - 8, 16, 16);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(fx - 8, fy - 8, 16, 16);
+        ctx.beginPath();
+        ctx.arc(fx, fy, 9, 0, L.TAU);
+        ctx.fillStyle = 'rgba(255, 176, 46, 0.25)';
+        ctx.fill();
+        ctx.strokeStyle = '#ffb02e';
+        ctx.lineWidth = 2;
+        ctx.stroke();
       }
 
       const r = state.run;
@@ -381,7 +380,7 @@
           ctx.beginPath();
           ctx.moveTo(p0[0], p0[1]);
           ctx.lineTo(p1[0], p1[1]);
-          ctx.strokeStyle = 'rgba(0, 0, 0, ' + (a * 0.45).toFixed(3) + ')';
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (a * 0.4).toFixed(3) + ')';
           ctx.lineWidth = 2;
           ctx.stroke();
         }
@@ -389,25 +388,24 @@
 
       const [ux, uy] = toPx(Controls.point.x, Controls.point.y);
       const sur = sim.stats().dans;
-      // Sur la piste : disque noir plein (liseré blanc). Hors piste : disque blanc
-      // à contour noir épais + croix noire épaisse (contraste max en N&B).
+      const couleur = sur ? '#000000' : '#ff3b30'; // curseur noir, rouge en cas de sortie
       ctx.beginPath();
-      ctx.arc(ux, uy, 7, 0, L.TAU);
-      ctx.fillStyle = sur ? '#000000' : '#ffffff';
+      ctx.arc(ux, uy, 6, 0, L.TAU);
+      ctx.fillStyle = couleur;
       ctx.fill();
-      ctx.strokeStyle = sur ? '#ffffff' : '#000000';
-      ctx.lineWidth = sur ? 2 : 3;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
       ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(ux - 12, uy); ctx.lineTo(ux + 12, uy);
       ctx.moveTo(ux, uy - 12); ctx.lineTo(ux, uy + 12);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = sur ? 2 : 3;
+      ctx.strokeStyle = couleur;
+      ctx.lineWidth = 2;
       ctx.stroke();
 
       updateHud();
     } else {
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = '#9db2d8';
       ctx.font = '22px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Appuyez sur « Démarrer » (ou Entrée) pour lancer le compte à rebours', CX, CY);
@@ -415,16 +413,16 @@
 
     const r = state.run;
     if (r && r.phase === 'countdown') {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+      ctx.fillStyle = 'rgba(10, 14, 26, 0.55)';
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = '#fff';
       ctx.font = 'bold 90px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(String(Math.ceil(r.countdownT)), CX, CY + 30);
     } else if (r && r.phase === 'paused') {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+      ctx.fillStyle = 'rgba(10, 14, 26, 0.55)';
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = '#fff';
       ctx.font = 'bold 48px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('PAUSE', CX, CY + 16);
