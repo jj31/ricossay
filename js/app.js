@@ -3,6 +3,7 @@
 
   const L = window.RicoLogic;
   const MidiRig = window.MidiRig;
+  const BleRig = window.BleRig;
   const Controls = window.Controls;
 
   const LS_HISTORY = 'ricochay.history.v1';
@@ -40,6 +41,35 @@
 
   function toPx(x, y) { return [CX + x * ECHELLE, CY - y * ECHELLE]; }
   function toNorm(px, py) { return [(px - CX) / ECHELLE, -(py - CY) / ECHELLE]; }
+
+  // Bips WebAudio (aucun fichier son) : bord de la piste + sortie de piste.
+  const Son = {
+    ctx: null,
+    actif: true,
+    dernierBord: -1,
+    init() {
+      if (!this.ctx) {
+        try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ctx = null; }
+      }
+      if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    },
+    bip(freq, duree, type, vol, minInterval) {
+      if (!this.actif || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      if (minInterval && now - this.dernierBord < minInterval) return;
+      if (minInterval) this.dernierBord = now;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type || 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol || 0.06, now);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + duree);
+      o.connect(g);
+      g.connect(this.ctx.destination);
+      o.start(now);
+      o.stop(now + duree + 0.02);
+    },
+  };
 
   // ---------- navigation ----------
   function show(screen) {
@@ -79,7 +109,7 @@
         const b = document.createElement('button');
         b.className = 'btn level-n' + niv.id;
         const best = bestFor(ex.id, niv.id);
-        b.textContent = 'N' + niv.id + ' · ' + niv.duree + ' s · ' + niv.vitesse + ' px/s · tol ' + niv.tolerance + ' px' +
+        b.textContent = 'N' + niv.id + ' · ' + niv.duree + ' s · tol ' + niv.tolerance + ' px' +
           (best !== null ? '  ★ ' + best.toFixed(1) + ' %' : '');
         b.title = niv.nom;
         b.addEventListener('click', () => startRun(ex, niv));
@@ -99,8 +129,11 @@
       ' · ' + (c.invX ? 'inversée' : 'normale') + '</li>' +
       '<li>Manivelle <strong>Y</strong> (vertical) : CC <strong>' + c.ccY + '</strong> · butées ' + c.minY + '–' + c.maxY +
       ' · ' + (c.invY ? 'inversée' : 'normale') + '</li>' +
-      '<li>Mode : <strong>' + (c.mode === 'position' ? 'position absolue (potentiomètre)' : 'relatif (encodeur à impulsions)') + '</strong>' +
-      (MidiRig.calib ? ' · <strong>calibration en cours…</strong> balayez chaque bouton sur toute sa course' : '') + '</li>';
+      '<li>Mode : <strong>' + (c.mode === 'position' ? 'position absolue (potentiomètre, avec butées)' : 'relatif (encodeurs infinis, sans butées)') + '</strong>' +
+      (MidiRig.calib ? ' · <strong>calibration en cours…</strong> balayez chaque bouton sur toute sa course' : '') + '</li>' +
+      '<li>Pads : Démarrer = <strong>' + (c.padStart === null ? 'non assigné' : 'note ' + c.padStart) + '</strong> · ' +
+      'Recommencer = <strong>' + (c.padRestart === null ? 'non assigné' : 'note ' + c.padRestart) + '</strong> · ' +
+      'Quitter = <strong>' + (c.padQuit === null ? 'non assigné' : 'note ' + c.padQuit) + '</strong></li>';
     const lx = $('btn-learn-x'), ly = $('btn-learn-y'), la = $('btn-learn-auto');
     if (MidiRig.learn === 'x') lx.textContent = '… tournez une manivelle pour X';
     else lx.textContent = 'Apprendre la manivelle X';
@@ -109,11 +142,19 @@
     if (MidiRig.learn === 'auto') la.textContent = '… 1ʳᵉ manivelle = X, 2ᵉ = Y';
     else la.textContent = 'Apprentissage auto (X puis Y)';
     $('btn-calib').textContent = MidiRig.calib ? 'Terminer la calibration des butées' : 'Calibrer les butées (balayer X et Y)';
+    const pads = [['btn-pad-start', 'start', 'Démarrer'], ['btn-pad-restart', 'restart', 'Recommencer'], ['btn-pad-quit', 'quit', 'Quitter']];
+    for (const [id, key, label] of pads) {
+      $(id).textContent = MidiRig.learnPad === key
+        ? '… appuyez sur un pad pour « ' + label + ' »'
+        : 'Apprendre le pad « ' + label + ' »';
+    }
     $('opt-mode').value = c.mode;
     $('opt-invx').checked = c.invX;
     $('opt-invy').checked = c.invY;
     $('opt-sens').value = c.sensibilite;
     $('opt-sens-val').textContent = Number(c.sensibilite).toFixed(2);
+    $('opt-sens-ble').value = BleRig.sens;
+    $('opt-sens-ble-val').textContent = BleRig.sens.toFixed(2);
   }
 
   function renderSeuilsEditor() {
@@ -142,12 +183,10 @@
   function startRun(exercice, niveau) {
     state.current = { exercice, niveau };
     state.sim = new L.RunSim({ exercice, niveau, echelle: ECHELLE });
-    state.run = { phase: 'idle', countdownT: 0, lastTs: 0, raf: null, trail: [] };
-    Controls.setCrank('x', 0.5);
-    Controls.setCrank('y', 0.5);
+    state.run = { phase: 'idle', countdownT: 0, lastTs: 0, raf: null, trail: [], prevDans: true };
+    Controls.anchor(state.sim.start[0], state.sim.start[1]);
     $('hud-exercice').textContent = exercice.nom + ' — ' + niveau.nom;
-    $('hud-vitesse').textContent = niveau.vitesse + ' px/s';
-    $('hud-tol').textContent = 'tolérance ' + niveau.tolerance + ' px';
+    $('hud-tol').textContent = 'tolérance ' + niveau.tolerance + ' px — départ au début du tracé';
     $('btn-pause').disabled = true;
     show('run');
     render();
@@ -157,6 +196,8 @@
     if (!state.run || state.run.phase !== 'idle') return;
     state.run.phase = 'countdown';
     state.run.countdownT = 3;
+    Controls.anchor(state.sim.start[0], state.sim.start[1]);
+    Son.init();
     state.run.lastTs = performance.now();
     state.run.raf = requestAnimationFrame(loop);
   }
@@ -198,6 +239,11 @@
       state.sim.update(dt, Controls.point);
       r.trail.push([Controls.point.x, Controls.point.y]);
       if (r.trail.length > 150) r.trail.shift();
+      const tol = state.current.niveau.tolerance;
+      const d = state.sim.dernierDistPx;
+      if (state.sim.dans && d >= tol * 0.75) Son.bip(1046, 0.06, 'square', 0.04, 0.25);
+      if (r.prevDans && !state.sim.dans) Son.bip(196, 0.18, 'sawtooth', 0.07);
+      r.prevDans = state.sim.dans;
       if (state.sim.termine) finishRun();
     }
     render();
@@ -216,12 +262,14 @@
       nomEx: exercice.nom,
       niveau: niveau.id,
       duree: niveau.duree,
-      vitesse: niveau.vitesse,
       tolerance: niveau.tolerance,
+      temps: Math.round(st.temps * 10) / 10,
+      motif: st.motif,
       pct: Math.round(st.pct * 10) / 10,
       sorties: st.sorties,
       ecartMoyenPx: Math.round(st.meanDistPx * 10) / 10,
       ecartMaxPx: Math.round(st.maxDistPx * 10) / 10,
+      couverturePct: Math.round(st.couverturePct * 10) / 10,
       classe,
     };
     state.history.unshift(entry);
@@ -236,10 +284,14 @@
     $('res-classe').textContent = 'Classe ' + e.classe;
     $('res-classe').className = 'classe-badge classe-' + e.classe;
     $('res-detail').innerHTML =
-      '<li>Exercice : <strong>' + e.nomEx + '</strong> — niveau ' + e.niveau + ' (' + e.duree + ' s, ' + e.vitesse + ' px/s, tolérance ' + e.tolerance + ' px)</li>' +
-      '<li>Temps sur la cible : <strong>' + (e.pct).toFixed(1) + ' %</strong> du temps</li>' +
+      '<li>Exercice : <strong>' + e.nomEx + '</strong> — niveau ' + e.niveau + ' (' + e.duree + ' s, tolérance ' + e.tolerance + ' px)</li>' +
+      '<li>' + (e.motif === 'arrivee'
+        ? 'Arrivée atteinte en <strong>' + e.temps.toFixed(1) + ' s</strong>'
+        : 'Temps écoulé : <strong>' + e.temps.toFixed(1) + ' s</strong> / ' + e.duree + ' s') + '</li>' +
+      '<li>Temps sur la trajectoire : <strong>' + e.pct.toFixed(1) + ' %</strong> du temps</li>' +
+      '<li>Progression : <strong>' + (e.couverturePct || 0).toFixed(0) + ' %</strong> du tracé parcouru</li>' +
       '<li>Sorties de piste : <strong>' + e.sorties + '</strong></li>' +
-      '<li>Écart moyen à la cible : <strong>' + e.ecartMoyenPx + ' px</strong> (max ' + e.ecartMaxPx + ' px)</li>' +
+      '<li>Écart moyen à la piste : <strong>' + e.ecartMoyenPx + ' px</strong> (max ' + e.ecartMaxPx + ' px)</li>' +
       '<li>Date : ' + new Date(e.ts).toLocaleString('fr-FR') + '</li>';
     const bar = $('res-bar');
     bar.innerHTML = '';
@@ -279,29 +331,45 @@
         if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
       }
       if (sim.exercice.fermee) ctx.closePath();
-      ctx.strokeStyle = 'rgba(90, 160, 255, 0.22)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
       ctx.lineWidth = niv.tolerance * 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(140, 190, 255, 0.85)';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      const [sx, sy] = toPx(sim.start[0], sim.start[1]);
+      ctx.beginPath();
+      ctx.arc(sx, sy, 9, 0, L.TAU);
+      ctx.fillStyle = 'rgba(57, 211, 83, 0.25)';
+      ctx.fill();
+      ctx.strokeStyle = '#39d353';
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      const cible = sim.cible();
-      const [tx, ty] = toPx(cible[0], cible[1]);
+      const proj = sim.distancePiste(Controls.point.x, Controls.point.y);
+      const pp = toPx(c.pts[proj.index][0], c.pts[proj.index][1]);
       ctx.beginPath();
-      ctx.arc(tx, ty, niv.tolerance, 0, L.TAU);
-      ctx.strokeStyle = 'rgba(255, 82, 82, 0.35)';
+      ctx.arc(pp[0], pp[1], 4, 0, L.TAU);
+      ctx.fillStyle = '#000000';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(tx, ty, 7, 0, L.TAU);
-      ctx.fillStyle = '#ff5252';
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+
+      if (!sim.exercice.fermee) {
+        const fin = L.pointSurCourbe(c, c.total);
+        const [fx, fy] = toPx(fin[0], fin[1]);
+        ctx.beginPath();
+        ctx.arc(fx, fy, 9, 0, L.TAU);
+        ctx.fillStyle = 'rgba(255, 176, 46, 0.25)';
+        ctx.fill();
+        ctx.strokeStyle = '#ffb02e';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
 
       const r = state.run;
       if (r && r.trail.length > 1) {
@@ -312,7 +380,7 @@
           ctx.beginPath();
           ctx.moveTo(p0[0], p0[1]);
           ctx.lineTo(p1[0], p1[1]);
-          ctx.strokeStyle = 'rgba(120, 220, 140, ' + (a * 0.5).toFixed(3) + ')';
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (a * 0.4).toFixed(3) + ')';
           ctx.lineWidth = 2;
           ctx.stroke();
         }
@@ -320,7 +388,7 @@
 
       const [ux, uy] = toPx(Controls.point.x, Controls.point.y);
       const sur = sim.stats().dans;
-      const couleur = sur ? '#39d353' : '#ff5252';
+      const couleur = sur ? '#000000' : '#ff3b30'; // curseur noir, rouge en cas de sortie
       ctx.beginPath();
       ctx.arc(ux, uy, 6, 0, L.TAU);
       ctx.fillStyle = couleur;
@@ -368,6 +436,7 @@
     const st = sim.stats();
     $('hud-temps').textContent = Math.max(0, state.current.niveau.duree - st.temps).toFixed(1) + ' s';
     $('hud-pct').textContent = st.temps > 0 ? (100 * st.tempsSur / st.temps).toFixed(1) + ' %' : '—';
+    $('hud-couv').textContent = st.couverturePct.toFixed(0) + ' %';
     $('hud-sorties').textContent = String(st.sorties);
   }
 
@@ -376,8 +445,8 @@
     const box = $('virtual-cranks');
     box.classList.toggle('hidden', !state.showVirtualCranks);
     if (!state.showVirtualCranks) return;
-    $('vc-x').style.bottom = (Controls.crankX * 100) + '%';
-    $('vc-y').style.bottom = (Controls.crankY * 100) + '%';
+    $('vc-x').style.bottom = (Math.min(1, Math.max(0, Controls.crankX)) * 100) + '%';
+    $('vc-y').style.bottom = (Math.min(1, Math.max(0, Controls.crankY)) * 100) + '%';
   }
 
   function bindVirtualCrank(el, axis) {
@@ -396,15 +465,16 @@
     const tbody = $('history-body');
     tbody.innerHTML = '';
     if (state.history.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="vide">Aucun essai enregistré pour le moment.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="vide">Aucun essai enregistré pour le moment.</td></tr>';
       return;
     }
     for (const h of state.history) {
       const tr = document.createElement('tr');
       const cells = [
         new Date(h.ts).toLocaleString('fr-FR'),
-        h.nomEx, 'N' + h.niveau, h.duree + ' s', h.vitesse + ' px/s', h.tolerance + ' px',
-        h.pct.toFixed(1) + ' %', h.sorties, 'C' + h.classe,
+        h.nomEx, 'N' + h.niveau, h.duree + ' s', h.tolerance + ' px',
+        h.pct.toFixed(1) + ' %', h.sorties, (h.couverturePct || 0).toFixed(0) + ' %',
+        h.motif === 'arrivee' ? '✓ ' + (h.temps || 0).toFixed(0) + ' s' : '—', 'C' + h.classe,
       ];
       for (const c of cells) {
         const td = document.createElement('td');
@@ -416,12 +486,12 @@
   }
 
   function exportCSV() {
-    const header = ['date', 'exercice', 'niveau', 'duree_s', 'vitesse_px_s', 'tolerance_px', 'pct_temps_sur_cible', 'sorties', 'ecart_moyen_px', 'ecart_max_px', 'classe'];
+    const header = ['date', 'exercice', 'niveau', 'duree_s', 'temps_s', 'arrivee', 'tolerance_px', 'pct_temps_sur_piste', 'sorties', 'ecart_moyen_px', 'ecart_max_px', 'couverture_pct', 'classe'];
     const lines = [header.join(';')];
     for (const h of state.history) {
       lines.push([
-        h.ts, '"' + h.nomEx + '"', h.niveau, h.duree, h.vitesse, h.tolerance,
-        h.pct, h.sorties, h.ecartMoyenPx, h.ecartMaxPx, h.classe,
+        h.ts, '"' + h.nomEx + '"', h.niveau, h.duree, h.temps || h.duree, h.motif === 'arrivee' ? 1 : 0, h.tolerance,
+        h.pct, h.sorties, h.ecartMoyenPx, h.ecartMaxPx, h.couverturePct || 0, h.classe,
       ].join(';'));
     }
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -435,24 +505,49 @@
   // ---------- câblage ----------
   function init() {
     Controls.init();
+    Controls.invX = !!MidiRig.config.invX;
+    Controls.invY = !!MidiRig.config.invY;
     Controls.cb.pause = () => { if (state.screen === 'run') togglePause(); };
     Controls.cb.start = () => { if (state.screen === 'run' && state.run && state.run.phase === 'idle') beginCountdown(); };
     Controls.cb.stop = () => { if (state.screen === 'run') quitRun(); };
 
-    MidiRig.cb.crank = (axis, v) => Controls.setCrank(axis, v);
-    MidiRig.cb.status = (txt) => { $('midi-status').textContent = txt; };
-    MidiRig.cb.mapping = () => { if (state.screen === 'setup') renderMappingInfo(); };
-    MidiRig.cb.raw = (txt) => {
+    function handlePadAction(name) {
+      if (state.screen !== 'run') return;
+      if (name === 'start') { if (state.run && state.run.phase === 'idle') beginCountdown(); }
+      else if (name === 'restart') { if (state.current) startRun(state.current.exercice, state.current.niveau); }
+      else if (name === 'quit') { quitRun(); }
+    }
+    function handleBleAction(name) {
+      if (state.screen !== 'run') return;
+      if (name === 'start') {
+        if (state.run && state.run.phase === 'idle') beginCountdown();
+        else if (state.current) startRun(state.current.exercice, state.current.niveau);
+      } else if (name === 'quit') { quitRun(); }
+    }
+    function pushMonitor(txt) {
       const ul = $('midi-monitor');
       const li = document.createElement('li');
       li.textContent = txt;
       ul.prepend(li);
       while (ul.children.length > 8) ul.removeChild(ul.lastChild);
-    };
+    }
+    MidiRig.cb.crank = (axis, v) => Controls.setCrank(axis, v);
+    MidiRig.cb.action = handlePadAction;
+    BleRig.cb.crank = (axis, v) => Controls.setCrank(axis, v);
+    BleRig.cb.action = handleBleAction;
+    BleRig.cb.status = (txt) => { $('ble-status').textContent = txt; };
+    BleRig.cb.raw = pushMonitor;
+    MidiRig.cb.status = (txt) => { $('midi-status').textContent = txt; };
+    MidiRig.cb.mapping = () => { if (state.screen === 'setup') renderMappingInfo(); };
+    MidiRig.cb.raw = pushMonitor;
 
     $('btn-midi-connect').addEventListener('click', async () => {
       $('midi-status').textContent = 'Demande d\'accès MIDI…';
       await MidiRig.connect();
+    });
+    $('btn-ble-connect').addEventListener('click', async () => {
+      $('ble-status').textContent = 'BLE : connexion…';
+      await BleRig.connect();
     });
     $('btn-setup').addEventListener('click', () => show('setup'));
     $('btn-history').addEventListener('click', () => show('history'));
@@ -473,13 +568,26 @@
       renderMappingInfo();
     });
     $('btn-midi-reset').addEventListener('click', () => { MidiRig.reset(); renderMappingInfo(); });
-    $('opt-mode').addEventListener('change', (e) => { MidiRig.config.mode = e.target.value; MidiRig.save(); });
-    $('opt-invx').addEventListener('change', (e) => { MidiRig.config.invX = e.target.checked; MidiRig.save(); });
-    $('opt-invy').addEventListener('change', (e) => { MidiRig.config.invY = e.target.checked; MidiRig.save(); });
+    $('btn-pad-start').addEventListener('click', () => { MidiRig.setLearnPad('start'); renderMappingInfo(); });
+    $('btn-pad-restart').addEventListener('click', () => { MidiRig.setLearnPad('restart'); renderMappingInfo(); });
+    $('btn-pad-quit').addEventListener('click', () => { MidiRig.setLearnPad('quit'); renderMappingInfo(); });
+    $('opt-mode').addEventListener('change', (e) => {
+      MidiRig.config.mode = e.target.value;
+      MidiRig.config.modeExplicite = true;
+      MidiRig.last.x = null; MidiRig.last.y = null;
+      MidiRig.save();
+    });
+    $('opt-invx').addEventListener('change', (e) => { MidiRig.config.invX = e.target.checked; Controls.invX = e.target.checked; MidiRig.save(); });
+    $('opt-invy').addEventListener('change', (e) => { MidiRig.config.invY = e.target.checked; Controls.invY = e.target.checked; MidiRig.save(); });
     $('opt-sens').addEventListener('input', (e) => {
       MidiRig.config.sensibilite = Number(e.target.value);
       $('opt-sens-val').textContent = MidiRig.config.sensibilite.toFixed(2);
       MidiRig.save();
+    });
+    $('opt-sens-ble').addEventListener('input', (e) => {
+      BleRig.sens = Number(e.target.value);
+      $('opt-sens-ble-val').textContent = BleRig.sens.toFixed(2);
+      BleRig.save();
     });
 
     $('btn-start').addEventListener('click', beginCountdown);
@@ -489,6 +597,7 @@
     $('btn-replay').addEventListener('click', () => { if (state.current) startRun(state.current.exercice, state.current.niveau); });
     $('btn-result-menu').addEventListener('click', () => show('menu'));
 
+    $('chk-son').addEventListener('change', (e) => { Son.actif = e.target.checked; });
     $('chk-virtual').addEventListener('change', (e) => {
       state.showVirtualCranks = e.target.checked;
       updateVirtualCranks();
@@ -513,6 +622,9 @@
       $('midi-status').textContent = 'Web MIDI indisponible : ouvrez la page avec Chrome/Edge en localhost ou HTTPS, puis reconnectez.';
     } else {
       MidiRig.connect();
+    }
+    if (!BleRig.supported) {
+      $('ble-status').textContent = 'BLE : Web Bluetooth indisponible (Chrome/Edge, page en localhost ou HTTPS).';
     }
 
     buildMenu();

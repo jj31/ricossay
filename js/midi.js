@@ -12,8 +12,14 @@
     minX: 0, maxX: 127,
     minY: 0, maxY: 127,
     invX: false, invY: false,
-    mode: 'position',      // 'position' (CC absolu) ou 'relatif' (encodeur à impulsions)
-    sensibilite: 1.0,      // gain du mode relatif
+    // Encodeurs rotatifs infinis (MPK mini / APC) : mode relatif par défaut,
+    // sans butées. 'position' ne sert que pour des potentiomètres avec butées.
+    mode: 'relatif',
+    modeExplicite: true,   // false tant que l'utilisateur n'a pas choisi le mode
+    sensibilite: 1.5,      // gain du mode relatif
+    padStart: null,        // notes des pads de fonction (appris par appui)
+    padRestart: null,
+    padQuit: null,
   };
 
   const MidiRig = {
@@ -23,12 +29,14 @@
     inputs: [],
     config: Object.assign({}, DEFAULTS),
     learn: null,            // null | 'x' | 'y' | 'auto'
+    learnPad: null,         // null | 'start' | 'restart' | 'quit'
     autoState: null,        // 'attenteX' | 'attenteY'
     calib: null,            // { x: {min,max}, y: {min,max} } pendant la calibration
     last: { x: null, y: null },
     crank: { x: 0.5, y: 0.5 },
     cb: {
       crank: function () {},   // (axis 'x'|'y', valeur normalisée 0..1)
+      action: function () {},  // ('start' | 'restart' | 'quit') appui sur un pad appris
       raw: function () {},     // (description texte du message MIDI brut)
       status: function () {},  // (texte de statut)
       mapping: function () {}, // la config a changé
@@ -37,7 +45,17 @@
     load() {
       try {
         const raw = localStorage.getItem(LS_KEY);
-        if (raw) this.config = Object.assign({}, DEFAULTS, JSON.parse(raw));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          this.config = Object.assign({}, DEFAULTS, parsed);
+          // Migration : une ancienne config (avant le choix explicite du mode)
+          // passait en mode relatif, sans butées, en conservant les CC appris.
+          if (!('modeExplicite' in parsed)) {
+            this.config.mode = 'relatif';
+            this.config.modeExplicite = true;
+            this.save();
+          }
+        }
       } catch (e) { /* config corrompue : on repart des défauts */ }
     },
     save() {
@@ -95,6 +113,11 @@
     setLearn(target) {
       this.learn = target;
       if (target === 'auto') this.autoState = 'attenteX';
+      this.cb.mapping(this.config);
+    },
+
+    setLearnPad(target) {
+      this.learnPad = target;
       this.cb.mapping(this.config);
     },
 
@@ -162,12 +185,20 @@
         }
 
         if (this.config.mode === 'relatif') {
+          // Encodeurs infinis : la manivelle virtuelle n'est PAS bornée à [0,1]
+          // (seul le point est borné par les bords de l'écran) -> amplitude illimitée.
           const prev = this.last[axis];
-          let delta = prev === null ? 0 : val - prev;
-          if (delta > 64) delta -= 128;
-          else if (delta < -64) delta += 128;
+          let delta = 0;
+          if (prev !== null) {
+            delta = val - prev;
+            delta = ((delta + 64) % 128 + 128) % 128 - 64; // ramené dans [-64, 63] (wrap absolu 127->0)
+            if (delta > 32) delta = 1;                     // convention 65/63 : un cran = 1 pas
+            else if (delta < -32) delta = -1;
+            if (val === 65) delta = 1;                     // la valeur elle-même indique le sens
+            else if (val === 63) delta = -1;
+          }
           this.last[axis] = val;
-          this.crank[axis] = Math.min(1, Math.max(0, this.crank[axis] + delta * 0.008 * this.config.sensibilite));
+          this.crank[axis] = Math.max(-100, Math.min(100, this.crank[axis] + delta * 0.02 * this.config.sensibilite));
           this.cb.crank(axis, this.crank[axis]);
         } else {
           this.last[axis] = val;
@@ -175,12 +206,25 @@
           const max = this.config['max' + axis.toUpperCase()];
           let norm = max > min ? (val - min) / (max - min) : val / 127;
           norm = Math.min(1, Math.max(0, norm));
-          if (this.config['inv' + axis.toUpperCase()]) norm = 1 - norm;
+          // L'inversion d'axe est gérée par Controls (s'applique à toutes les sources).
           this.crank[axis] = norm;
           this.cb.crank(axis, norm);
         }
-      } else if (type === 0x90 || type === 0x80) {
-        this.cb.raw('Note ' + d1 + ' ' + (type === 0x90 ? 'on' : 'off') + ' vel ' + d2);
+      } else if (type === 0x90 && d2 > 0) {
+        // Appui sur un pad (Note On, vélocité > 0), quel que soit le canal.
+        this.cb.raw('Note ' + d1 + ' on (canal ' + ((status & 0x0F) + 1) + ')');
+        if (this.learnPad) {
+          const key = 'pad' + this.learnPad[0].toUpperCase() + this.learnPad.slice(1);
+          this.config[key] = d1;
+          this.learnPad = null;
+          this.save();
+          return;
+        }
+        if (d1 === this.config.padStart) this.cb.action('start');
+        else if (d1 === this.config.padRestart) this.cb.action('restart');
+        else if (d1 === this.config.padQuit) this.cb.action('quit');
+      } else if (type === 0x80 || type === 0x90) {
+        this.cb.raw('Note ' + d1 + ' off');
       }
     },
   };

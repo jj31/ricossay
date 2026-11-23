@@ -13,21 +13,30 @@
   <p class="subtitle">Poursuite bimanuelle à deux manivelles — entraînement type épreuve psychomotrice (APC mk2 en USB / Web MIDI)</p>
   <div class="toolbar">
     <button id="btn-midi-connect" class="btn">Reconnecter MIDI</button>
+    <button id="btn-ble-connect" class="btn">Connecter ESP32 (BLE)</button>
     <button id="btn-setup" class="btn">Apprendre / calibrer les boutons</button>
     <button id="btn-history" class="btn">Historique</button>
     <label class="chk"><input type="checkbox" id="chk-virtual"> Manivelles à l'écran</label>
+    <label class="chk"><input type="checkbox" id="chk-son" checked> Son (bip au bord de la piste)</label>
   </div>
   <div id="midi-status" class="midi-status">MIDI : initialisation…</div>
+  <div id="ble-status" class="midi-status">BLE : non connecté (ESP32-C6 + 2 KY-040 — voir firmware/)</div>
 </header>
 
 <main>
   <!-- Menu des exercices -->
   <section id="screen-menu">
     <p class="aide">
-      Principe de l'épreuve : un point cible (rouge) se déplace automatiquement le long de la trajectoire.
-      Avec les deux manivelles (boutons rotatifs de l'APC : X horizontal, Y vertical), gardez votre point (vert)
-      sur la cible le plus longtemps possible. Le score est le <strong>pourcentage du temps sur la cible</strong>,
+      Principe de l'épreuve : votre point (noir, qui passe au <strong>rouge en cas de sortie</strong>)
+      <strong>démarre au début de la trajectoire</strong> (marqueur vert).
+      Parcourez le tracé avec les deux manivelles (boutons rotatifs : X horizontal, Y vertical)
+      <strong>sans sortir de la piste blanche</strong> (bande = tolérance). Chaque sortie de piste est détectée
+      et comptabilisée. Le score est le <strong>pourcentage du temps passé sur la trajectoire</strong>,
       converti en classe 1–9. Niveau 3 = essai de 2 minutes, comme l'épreuve standard.
+      L'essai s'arrête dès que vous atteignez <strong>l'arrivée</strong> (extrémité du tracé,
+      ou un tour complet pour les circuits fermés — marqueur orange). Un bip retentit quand
+      vous touchez le bord de la piste, et un autre quand vous en sortez.
+      Sur l'écran d'essai, les pads appris (config MIDI) lancent Démarrer / Recommencer / Quitter.
       Sans APC : flèches du clavier / WASD, ou souris directement sur le plateau.
     </p>
     <div id="exercise-grid" class="grid"></div>
@@ -50,6 +59,14 @@
           <button id="btn-calib" class="btn">Calibrer les butées (balayer X et Y)</button>
           <button id="btn-midi-reset" class="btn danger">Réinitialiser</button>
         </div>
+        <h3>Pads de fonction (écran d'essai)</h3>
+        <p>Cliquez sur un bouton puis <strong>appuyez sur un pad</strong> du contrôleur :
+          il déclenchera Démarrer, Recommencer ou Quitter pendant l'essai.</p>
+        <div class="btn-row">
+          <button id="btn-pad-start" class="btn">Apprendre le pad « Démarrer »</button>
+          <button id="btn-pad-restart" class="btn">Apprendre le pad « Recommencer »</button>
+          <button id="btn-pad-quit" class="btn">Apprendre le pad « Quitter »</button>
+        </div>
         <ul id="mapping-info" class="mapping-info"></ul>
         <h3>Options</h3>
         <div class="opt-row">
@@ -65,13 +82,22 @@
             <input type="range" id="opt-sens" min="0.2" max="3" step="0.1" value="1">
             <span id="opt-sens-val">1.00</span>
           </label>
+          <label>Sensibilité BLE (KY-040, pas de quadrature) :
+            <input type="range" id="opt-sens-ble" min="0.05" max="3" step="0.01" value="1">
+            <span id="opt-sens-ble-val">1.00</span>
+          </label>
         </div>
         <h3>Seuils des classes (stanines)</h3>
         <div id="seuils-editor" class="seuils-editor"></div>
       </div>
       <div class="panel">
-        <h3>Moniteur MIDI (derniers messages)</h3>
+        <h3>Moniteur (derniers messages MIDI / BLE)</h3>
         <ul id="midi-monitor" class="monitor"></ul>
+        <p class="aide">Interface BLE alternative : ESP32-C6 + 2 encodeurs KY-040.
+          Firmware Arduino dans <code>firmware/esp32-ky040/</code> (ESP32-C3 ou C6, service Nordic UART,
+          protocole binaire 2 octets : [0,d]=X, [1,d]=Y, [2,1]=bouton X, [3,1]=bouton Y).
+          Bouton « Connecter ESP32 (BLE) » en haut de page ; SW X = Démarrer/Recommencer,
+          SW Y = Quitter.</p>
       </div>
     </div>
     <div class="btn-row"><button id="btn-back-menu" class="btn">Retour au menu</button></div>
@@ -82,9 +108,9 @@
     <div class="hud">
       <span id="hud-exercice" class="hud-title"></span>
       <span>Temps restant : <strong id="hud-temps">—</strong></span>
-      <span>Sur la cible : <strong id="hud-pct">—</strong></span>
+      <span>Sur la piste : <strong id="hud-pct">—</strong></span>
+      <span>Progression : <strong id="hud-couv">—</strong></span>
       <span>Sorties : <strong id="hud-sorties">0</strong></span>
-      <span id="hud-vitesse"></span>
       <span id="hud-tol"></span>
     </div>
     <div class="board-wrap">
@@ -127,7 +153,7 @@
     </div>
     <table class="history">
       <thead>
-        <tr><th>Date</th><th>Exercice</th><th>Niv.</th><th>Durée</th><th>Vitesse</th><th>Tol.</th><th>% cible</th><th>Sorties</th><th>Classe</th></tr>
+        <tr><th>Date</th><th>Exercice</th><th>Niv.</th><th>Durée</th><th>Tol.</th><th>% piste</th><th>Sorties</th><th>Progression</th><th>Arrivée</th><th>Classe</th></tr>
       </thead>
       <tbody id="history-body"></tbody>
     </table>
@@ -136,6 +162,7 @@
 
 <script src="js/logic.js"></script>
 <script src="js/midi.js"></script>
+<script src="js/ble.js"></script>
 <script src="js/controls.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -8,8 +8,11 @@ test de ricossay
 
 Application web d'entraînement à l'épreuve dite **de Ricochay** : deux manivelles
 orthogonales (X horizontal, Y vertical) déplacent un point à l'écran, et le sujet
-doit maintenir ce point sur une **cible qui se déplace automatiquement le long d'une
-trajectoire**, le plus longtemps possible.
+doit **parcourir le tracé sans en sortir** : le point **démarre au début de la
+trajectoire** et chaque sortie de piste est détectée et comptabilisée.
+L'essai **s'arrête dès l'arrivée** (extrémité du tracé, ou un tour complet pour les
+circuits fermés). Un **bip** retentit quand le point touche le bord de la piste
+(WebAudio, case « Son » en haut de page).
 
 Les deux manivelles sont les **boutons rotatifs (encodeurs) d'un Akai APC mk2**,
 connecté en USB et lu via l'**API Web MIDI** du navigateur. L'application prévoit
@@ -20,20 +23,27 @@ Aucune dépendance, aucun build : page statique en HTML/CSS/JS vanilla.
 
 ## Standards de l'épreuve (recherche effectuée)
 
-- **Principe** : poursuite bimanuelle (*pursuit tracking*) — la cible avance à vitesse
-  constante sur un circuit ; on mesure le **temps de contact** du point sur la cible.
+- **Principe retenu ici** : le mobile part du début du circuit et doit le parcourir
+  lui-même sans sortir de la piste ; on mesure le **temps passé sur la piste** et le
+  **nombre de sorties** (détection de sortie de trajectoire). La variante classique de
+  l'appareil à point moteur que l'on poursuit n'est pas retenue ici.
 - **Durée usuelle d'un essai : 2 minutes** (standard des épreuves prolongées de
   coordination psychomotrice en sélection).
-- **Score** : pourcentage du temps passé sur la cible, converti en **classe (stanine)
+- **Score** : pourcentage du temps passé sur la piste, converti en **classe (stanine)
   de 1 à 9**. Seuils usuels constatés dans la communauté des candidats pilotes
   (ex. retours sur le test psychomoteur type Pilotest/EPL) : **classe 8 à partir de
   78 %, classe 9 à partir de 82 %**. Les seuils sont modifiables dans l'interface.
-- **Niveaux de difficulté** : vitesse de déplacement de la cible, largeur de la piste
-  (tolérance) et complexité de la trajectoire.
+- **Niveaux de difficulté** : largeur de la piste (tolérance), durée de l'essai et
+  complexité de la trajectoire.
 
 > Les barèmes officiels des sélections ne sont pas publiés ; les valeurs ci-dessus sont
 > les standards usuels rapportés publiquement. Tout est paramétrable dans l'app
-> (vitesse, tolérance, durée, seuils de classe).
+> (tolérance, durée, seuils de classe).
+
+## Thème
+
+Interface **noir et blanc haute contraste** (fond blanc, texte et tracés noirs, piste
+en bande grise) — lisible en projection ou sur écran peu contrasté.
 
 ## Lancement
 
@@ -58,8 +68,15 @@ python3 -m http.server 8080
    (Ou apprentissage manuel bouton par bouton.)
 4. Cliquer sur **« Calibrer les butées »** et balayer chaque bouton rotatif sur toute
    sa course, puis terminer : la course complète du bouton couvre alors tout l'écran.
-5. Options : inversion de X/Y, mode **position absolue** (potentiomètres de l'APC,
-   réglage par défaut) ou **relatif** (encodeurs à impulsions), sensibilité.
+5. Options : inversion de X/Y (s'applique à **toutes** les sources : MIDI, BLE, clavier),
+   mode **relatif — réglage par défaut** (encodeurs
+   rotatifs infinis type MPK mini : **amplitude illimitée**, la manivelle virtuelle
+   n'est pas bornée — seul le point est limité par les bords de l'écran ; gère les
+   conventions 1/127, wrap absolu 127→0 et 65/63) ou **position absolue**
+   (potentiomètres avec butées), et la sensibilité (gain du mode relatif).
+6. **Pads de fonction** : trois boutons d'apprentissage assignent des pads
+   (Note On) à **Démarrer**, **Recommencer** et **Quitter** sur l'écran d'essai :
+   cliquez sur « Apprendre le pad… » puis appuyez sur le pad du contrôleur.
 
 Rappels de mapping usine de l'APC mini mk2 (canal 1) : pads = notes 0–63,
 faders = CC 48–55 (+ master 56), boutons track/scene = notes 100–107 / 112–119.
@@ -69,7 +86,29 @@ derniers messages reçus pour vérifier.
 
 La configuration est persistée dans `localStorage`.
 
-## Sans APC mk2
+## Interface BLE : ESP32-C3 (ou C6) + 2 encodeurs KY-040 (recommandé)
+
+Les KY-040 sont des encodeurs à quadrature **infinis et précis** (1 pas = 1 impulsion,
+pas de limite à 127 comme un CC MIDI absolu). L'ESP32 envoie les pas par
+**Bluetooth (BLE)** directement dans le navigateur via **Web Bluetooth**.
+**C3 ou C6 : aucun changement fonctionnel** (même BLE, même API Arduino, même
+protocole) — seule la carte change dans l'IDE.
+
+- **Firmware** : `firmware/esp32-ky040/esp32-ky040.ino`. Arduino IDE : carte
+  « **ESP32C3 Dev Module** » (ou « ESP32C6 Dev Module »), core ESP32 ≥ 2.0.
+  Câblage (broches sûres sur C3 et C6 — sur C3 éviter GPIO8/9 = flash/strapping
+  et GPIO18/19 = USB) : KY-040 X → CLK GPIO4 / DT GPIO5 / SW GPIO3 ;
+  KY-040 Y → CLK GPIO6 / DT GPIO7 / SW GPIO10 (+3,3 V et GND communs).
+- **Protocole** (service Nordic UART, notif binaire 2 octets) : `[0,d]` = axe X,
+  `[1,d]` = axe Y (d = int8 signé), `[2,1]` = bouton SW X, `[3,1]` = bouton SW Y.
+- **Côté page** : bouton **« Connecter ESP32 (BLE) »** en haut de page (Chrome/Edge,
+  localhost ou HTTPS — Web Bluetooth exige un contexte sécurisé). Le nom annoncé
+  est `RICOCHAY-ESP`. SW X = Démarrer/Recommencer, SW Y = Quitter.
+- Les manivelles BLE ne sont **pas bornées** (encodeurs infinis) ; sensibilité réglable
+  de **0,05 à 3** (« Sensibilité BLE » dans la configuration, pas de 0,01), persistée.
+- Le moniteur affiche les événements BLE reçus (`BLE X +3 -> manivelle 0.42`…).
+
+## Sans contrôleur (MPK/ESP32)
 
 - **Clavier** : flèches (ou ZQSD/WASD) pour X/Y, `Entrée` = démarrer,
   `Espace` = pause, `Échap` = quitter.
@@ -78,22 +117,26 @@ La configuration est persistée dans `localStorage`.
 
 ## Exercices et niveaux de difficulté
 
-9 trajectoires : ligne horizontale, ligne verticale, diagonale, cercle, ellipse,
-sinusoïde, carré (angles), huit (lemniscate), Lissajous 3:2. Les courbes ouvertes
+12 trajectoires : ligne horizontale, ligne verticale, diagonale, cercle, ellipse,
+sinusoïde, carré (angles), huit (lemniscate), Lissajous 3:2, **boucle ouverte en goutte**
+(d'après image de référence, spline de Catmull-Rom), **chicane** (droites + demi-cercles
+alternés haut/bas) et **circuit routier** (droites, quarts de cercle en virages, diagonales,
+demi-cercle — type parcours d'examen de conduite). Les courbes ouvertes
 sont parcourues en aller-retour ; les fermées en boucle.
 
 Chaque exercice propose **3 niveaux** :
 
-| Niveau | Vitesse cible | Tolérance | Durée |
-|--------|---------------|-----------|-------|
-| N1 Découverte | 80 px/s | 26 px | 60 s |
-| N2 Confirmé | 140 px/s | 18 px | 90 s |
-| N3 Expert | 210 px/s | 12 px | **120 s (2 min, standard)** |
+| Niveau | Tolérance (demi-largeur de piste) | Durée |
+|--------|-------------------------------------|-------|
+| N1 Découverte | 26 px | 60 s |
+| N2 Confirmé | 18 px | 90 s |
+| N3 Expert | 12 px | **120 s (2 min, standard)** |
 
 ## Scoring et historique
 
-- Score = **% du temps avec le point dans la zone de tolérance autour de la cible**.
-- Statistiques : sorties de piste (transitions hors zone), écart moyen/max à la cible.
+- Score = **% du temps avec le point dans la zone de tolérance autour du tracé** (la piste).
+- Statistiques : sorties de piste (transitions hors zone), écart moyen/max à la piste,
+  progression = % du tracé parcouru, temps mis et motif d'arrêt (**arrivée** ou **durée max**).
 - **Classe 1–9** via les seuils modifiables (défaut : 82/78/74/70/65/60/52/42 %).
 - Historique local (`localStorage`, 500 essais), meilleur score affiché (★) par
   exercice/niveau, **export CSV**.
@@ -105,7 +148,9 @@ index.html          page unique (menu, config, essai, résultat, historique)
 css/style.css
 js/logic.js         trajectoires, niveaux, simulation d'essai, classes (pur, testable)
 js/midi.js          Web MIDI : connexion, MIDI learn, calibration, persistance
-js/controls.js      manivelles -> point (MIDI, clavier, souris)
+js/ble.js           Web Bluetooth : ESP32-C6 + KY-040 (NUS, protocole 2 octets)
+js/controls.js      manivelles -> point (MIDI, BLE, clavier, souris)
+firmware/esp32-ky040/    sketch Arduino ESP32-C3/C6 + 2 KY-040 -> BLE
 js/app.js           écrans, rendu canvas, boucle de jeu, historique, CSV
 test/*.test.js      tests Node (aucun framework requis)
 ```
@@ -113,7 +158,8 @@ test/*.test.js      tests Node (aucun framework requis)
 ## Tests
 
 ```bash
-node test/logic.test.js     # trajectoires, avance de la cible, scoring, classes
-node test/midi.test.js      # apprentissage CC, calibration, modes position/relatif
+node test/logic.test.js     # trajectoires, point de départ, distance à la piste, arrêt à l'arrivée, scoring, classes
+node test/midi.test.js      # apprentissage CC + pads, calibration, modes position/relatif, migration
 node test/controls.test.js  # manivelles -> point, clavier, souris
+node test/ble.test.js       # décodage paquets BLE, manivelles non bornées, actions boutons, persistance
 ```
