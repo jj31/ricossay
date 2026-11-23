@@ -40,6 +40,11 @@ Aucune dépendance, aucun build : page statique en HTML/CSS/JS vanilla.
 > les standards usuels rapportés publiquement. Tout est paramétrable dans l'app
 > (tolérance, durée, seuils de classe).
 
+## Thème
+
+Interface **noir et blanc haute contraste** (fond blanc, texte et tracés noirs, piste
+en bande grise) — lisible en projection ou sur écran peu contrasté.
+
 ## Lancement
 
 Web MIDI exige un **contexte sécurisé** : `localhost` convient.
@@ -112,7 +117,7 @@ protocole) — seule la carte change dans l'IDE.
 
 ## Exercices et niveaux de difficulté
 
-9 trajectoires : ligne horizontale, ligne verticale, diagonale, cercle, ellipse,
+12 trajectoires : ligne horizontale, ligne verticale, diagonale, cercle, ellipse,
 sinusoïde, carré (angles), huit (lemniscate), Lissajous 3:2, **boucle ouverte en goutte**
 (d'après image de référence, spline de Catmull-Rom), **chicane** (droites + demi-cercles
 alternés haut/bas) et **circuit routier** (droites, quarts de cercle en virages, diagonales,
